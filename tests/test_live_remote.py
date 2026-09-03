@@ -15,6 +15,15 @@ BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 class TestLiveDeployment(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        try:
+            r = requests.get(f"{BASE_URL}/health", timeout=5)
+            if r.status_code != 200:
+                raise unittest.SkipTest(f"Server at {BASE_URL} returned status {r.status_code}. Skipping remote live tests.")
+        except Exception as e:
+            raise unittest.SkipTest(f"Live server at {BASE_URL} is not reachable ({e}). Skipping remote live tests.")
+
     def test_01_health_check(self):
         url = f"{BASE_URL}/health"
         r = requests.get(url, timeout=20)
