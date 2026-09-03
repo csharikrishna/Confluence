@@ -1,0 +1,15 @@
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local logs & test outputs
+stress_test_report.json
+model_grounding_comparison*.json
+model_comparison_two_families.json
