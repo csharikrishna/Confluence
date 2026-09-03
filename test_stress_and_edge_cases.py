@@ -10,7 +10,10 @@ from env_intelligence_test import (
     fetch_weather,
     fetch_marine,
     fetch_air_quality,
+    fetch_sun_and_lighting,
+    fetch_elevation,
     fetch_climate_baseline,
+    fetch_seismic_risk,
     LOCATION,
     OPENAQ_API_KEY,
 )
@@ -30,35 +33,52 @@ def run_tests():
     lat, lon = LOCATION["lat"], LOCATION["lon"]
 
     print("=" * 75)
-    print("RUNNING TASK #4: Kill Each API One At A Time (4 Independent Runs)")
+    print("RUNNING TASK #4: Kill Each API One At A Time (7 Independent Runs)")
     print("=" * 75)
 
-    sources = ["weather", "marine", "air_quality", "climate_baseline"]
+    source_name_map = {
+        "weather": "open-meteo",
+        "marine": "open-meteo-marine",
+        "air_quality": "openaq",
+        "sun_and_lighting": "sunrise-sunset.org",
+        "terrain": "open-meteo-elevation",
+        "climate_baseline": "nasa-power",
+        "seismic_risk": "usgs-earthquake",
+    }
+
+    sources = list(source_name_map.keys())
     for killed in sources:
         print(f"\n--> Testing failure isolation when killing '{killed}'...")
         w = fetch_weather(lat, lon, base_url="https://invalid-host-weather.test/fail") if killed == "weather" else fetch_weather(lat, lon)
         m = fetch_marine(lat, lon, base_url="https://invalid-host-marine.test/fail") if killed == "marine" else fetch_marine(lat, lon)
         aq = fetch_air_quality(lat, lon, base_url="https://invalid-host-openaq.test/fail") if killed == "air_quality" else fetch_air_quality(lat, lon, api_key=OPENAQ_API_KEY)
+        sun = fetch_sun_and_lighting(lat, lon, base_url="https://invalid-host-sun.test/fail") if killed == "sun_and_lighting" else fetch_sun_and_lighting(lat, lon)
+        terr = fetch_elevation(lat, lon, base_url="https://invalid-host-elevation.test/fail") if killed == "terrain" else fetch_elevation(lat, lon)
         cb = fetch_climate_baseline(lat, lon, base_url="https://invalid-host-nasa.test/fail") if killed == "climate_baseline" else fetch_climate_baseline(lat, lon)
+        seis = fetch_seismic_risk(lat, lon, base_url="https://invalid-host-seismic.test/fail") if killed == "seismic_risk" else fetch_seismic_risk(lat, lon)
 
-        data = {"weather": w, "marine": m, "air_quality": aq, "climate_baseline": cb}
-        failed = [s["source"] for s in [w, m, aq, cb] if s.get("status") == "error"]
-
-        source_name_map = {
-            "weather": "open-meteo",
-            "marine": "open-meteo-marine",
-            "air_quality": "openaq",
-            "climate_baseline": "nasa-power",
+        all_7 = [w, m, aq, sun, terr, cb, seis]
+        data = {
+            "weather": w,
+            "marine": m,
+            "air_quality": aq,
+            "sun_and_lighting": sun,
+            "terrain": terr,
+            "climate_baseline": cb,
+            "seismic_risk": seis,
         }
-        expected_failed = source_name_map[killed]
+        failed = [s["source"] for s in all_7 if s.get("status") == "error"]
 
+        expected_failed = source_name_map[killed]
         passed = (failed == [expected_failed])
+        other_6_ok = all(s.get('status') == 'ok' for s in all_7 if s['source'] != expected_failed)
+
         print(f"    Expected failed: [{expected_failed}], Actual failed: {failed}")
-        print(f"    Other 3 sources status ok: {all(s.get('status') == 'ok' for s in [w, m, aq, cb] if s['source'] != expected_failed)}")
-        print(f"    Result: {'[PASS]' if passed else '[FAIL]'}")
+        print(f"    Other 6 sources status ok: {other_6_ok}")
+        print(f"    Result: {'[PASS]' if (passed and other_6_ok) else '[FAIL]'}")
 
         report["task_4_kill_each_api"][f"kill_{killed}"] = {
-            "passed": passed,
+            "passed": passed and other_6_ok,
             "failed_sources": failed,
             "error_detail": data[killed].get("error"),
         }
