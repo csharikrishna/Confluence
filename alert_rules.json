@@ -1,0 +1,167 @@
+[
+  {
+    "id": "pm25_unhealthy",
+    "description": "PM2.5 unhealthy for general population",
+    "type": "threshold",
+    "field": "data.air_quality.pm25",
+    "operator": "gte",
+    "threshold": 55.5,
+    "severity": "high",
+    "message": "PM2.5 at {value} ug/m3 - Unhealthy air quality. Sensitive groups should avoid prolonged outdoor exertion."
+  },
+  {
+    "id": "pm25_very_unhealthy",
+    "description": "PM2.5 very unhealthy for general population",
+    "type": "threshold",
+    "field": "data.air_quality.pm25",
+    "operator": "gte",
+    "threshold": 150.5,
+    "severity": "critical",
+    "message": "PM2.5 at {value} ug/m3 - Very Unhealthy. General population should limit outdoor exertion; N95 masks advised."
+  },
+  {
+    "id": "small_craft_unsafe",
+    "description": "NWS-equivalent marine warning tier at or above Small Craft Advisory",
+    "type": "threshold",
+    "field": "derived.small_craft_risk_level",
+    "operator": "in",
+    "threshold": ["small_craft_advisory", "gale_warning", "storm_warning", "hurricane_force_warning"],
+    "severity": "high",
+    "context_fields": {
+      "wave": "data.marine.wave_height_m",
+      "wind": "data.weather.wind_speed_kmh"
+    },
+    "message": "Marine warning '{value}' in effect (wave {wave}m, wind {wind}km/h). Do not launch small or artisanal vessels."
+  },
+  {
+    "id": "storm_level_wind",
+    "description": "Sustained storm-force wind",
+    "type": "threshold",
+    "field": "data.weather.wind_speed_kmh",
+    "operator": "gt",
+    "threshold": 40,
+    "severity": "high",
+    "message": "Storm-level sustained wind at {value} km/h."
+  },
+  {
+    "id": "gale_gusts",
+    "description": "Gale-force gusts",
+    "type": "threshold",
+    "field": "data.weather.wind_gusts_kmh",
+    "operator": "gt",
+    "threshold": 60,
+    "severity": "high",
+    "message": "Gale-force gusts recorded at {value} km/h - secure loose objects and moorings."
+  },
+  {
+    "id": "heavy_rain_flood_risk",
+    "description": "Heavy precipitation with localized flooding potential",
+    "type": "threshold",
+    "field": "data.weather.precipitation_mm",
+    "operator": "gt",
+    "threshold": 30,
+    "severity": "medium",
+    "message": "Heavy precipitation ({value} mm) - localized flooding possible in low-lying areas."
+  },
+  {
+    "id": "heat_index_danger",
+    "description": "Heat index in NOAA 'danger' band or above",
+    "type": "threshold",
+    "field": "derived.heat_index_c",
+    "operator": "gte",
+    "threshold": 39.4,
+    "severity": "high",
+    "message": "Heat index at {value}C - danger zone for prolonged outdoor labor. Mandate hydration breaks and shade rotation."
+  },
+  {
+    "id": "coastal_flood_risk_high",
+    "description": "Composite storm-surge/coastal-flood risk score high or severe",
+    "type": "threshold",
+    "field": "derived.coastal_flood_risk.score",
+    "operator": "gte",
+    "threshold": 0.6,
+    "severity": "high",
+    "message": "Composite coastal flood/storm-surge risk score {value} - low-lying areas should prepare."
+  },
+  {
+    "id": "seismic_tsunami_caution",
+    "description": "Significant nearby seismic event combined with low-lying coast",
+    "type": "threshold",
+    "field": "derived.tsunami_advisory.advisory",
+    "operator": "eq",
+    "threshold": true,
+    "severity": "critical",
+    "context_fields": {
+      "reason": "derived.tsunami_advisory.reason"
+    },
+    "message": "Tsunami caution: {reason}"
+  },
+  {
+    "id": "air_stagnation_high",
+    "description": "Still air, no rain, and elevated PM2.5 - pollutants accumulating",
+    "type": "threshold",
+    "field": "derived.air_stagnation_index",
+    "operator": "eq",
+    "threshold": "high",
+    "severity": "medium",
+    "message": "Air stagnation detected (low wind, no rain, elevated PM2.5) - pollutant levels likely to keep worsening."
+  },
+  {
+    "id": "storm_potential_severe",
+    "description": "Composite storm-potential score high or severe",
+    "type": "threshold",
+    "field": "derived.storm_potential_level",
+    "operator": "in",
+    "threshold": ["high", "severe"],
+    "severity": "high",
+    "context_fields": {
+      "score": "derived.storm_potential_score"
+    },
+    "message": "Composite storm potential is '{value}' (score {score}) - monitor for rapid deterioration."
+  },
+  {
+    "id": "rapid_pressure_fall",
+    "description": "Latitude-normalized rapid pressure fall (Bergeron/Sanders-Gyakum criterion) over 24h",
+    "type": "threshold",
+    "field": "derived.rapid_pressure_fall.rapid_fall",
+    "operator": "eq",
+    "threshold": true,
+    "severity": "high",
+    "context_fields": {
+      "change": "derived.rapid_pressure_fall.change_24h_hpa"
+    },
+    "message": "Rapid pressure fall detected: {change} hPa in 24h, exceeding the latitude-normalized rapid-intensification threshold - monitor for a developing low-pressure system."
+  },
+  {
+    "id": "imd_cyclonic_storm_or_higher",
+    "description": "Sustained wind has reached IMD's official cyclonic-storm classification or higher",
+    "type": "threshold",
+    "field": "derived.imd_cyclone_category",
+    "operator": "in",
+    "threshold": ["cyclonic_storm", "severe_cyclonic_storm", "very_severe_cyclonic_storm", "extremely_severe_cyclonic_storm", "super_cyclonic_storm"],
+    "severity": "critical",
+    "message": "IMD cyclone classification: '{value}'. Follow official IMD/local disaster-management guidance."
+  },
+  {
+    "id": "trend_temp_spike_3h",
+    "description": "Rapid temperature rise over a 3-hour window",
+    "type": "trend",
+    "field": "data.weather.temperature_c",
+    "window_hours": 3,
+    "operator": "gt",
+    "threshold": 5,
+    "severity": "medium",
+    "message": "Rapid heat spike: temperature rose {value}C in the last {window_hours}h."
+  },
+  {
+    "id": "trend_pm25_doubling_3h",
+    "description": "PM2.5 roughly doubled or worse over a 3-hour window",
+    "type": "trend_ratio",
+    "field": "data.air_quality.pm25",
+    "window_hours": 3,
+    "operator": "gte",
+    "threshold": 2.0,
+    "severity": "high",
+    "message": "PM2.5 has increased {value}x in the last {window_hours}h - rapidly worsening air quality."
+  }
+]

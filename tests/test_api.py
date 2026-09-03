@@ -25,7 +25,7 @@ class TestFastAPIApp(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("service", data)
-        self.assertEqual(data["version"], "1.0.0")
+        self.assertEqual(data["version"], "2.0.0")
         self.assertIn("documentation", data)
 
     def test_health_endpoint(self):
@@ -34,6 +34,9 @@ class TestFastAPIApp(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["status"], "healthy")
         self.assertIn("concurrency", data)
+        self.assertIn("history_store_status", data)
+        self.assertIn("alert_webhook", data)
+        self.assertEqual(data["phase"], 2)
 
     def test_environment_invalid_coordinates_returns_400(self):
         # Lat > 90

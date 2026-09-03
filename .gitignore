@@ -13,3 +13,7 @@ __pycache__/
 stress_test_report.json
 model_grounding_comparison*.json
 model_comparison_two_families.json
+
+# Phase 2: local SQLite history store (ephemeral on free-tier hosting; not source)
+*.db
+*.db-journal

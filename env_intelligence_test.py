@@ -609,9 +609,23 @@ def fetch_seismic_risk(lat, lon, timeout=TIMEOUT, base_url="https://earthquake.u
         max_mag = max(mags) if mags else None
         hazard = "elevated (M>=6.0 nearby)" if (max_mag and max_mag >= 6.0) else "nominal"
 
+        # GeoJSON coordinates are [lon, lat, depth_km] — depth of the strongest event
+        # matters for tsunami risk (shallow-focus quakes, USGS-defined as <70km, are
+        # far more tsunamigenic than deep-focus ones of the same magnitude).
+        depth_km = None
+        if mags:
+            strongest = max(
+                (f for f in features if f.get("properties", {}).get("mag") is not None),
+                key=lambda f: f["properties"]["mag"],
+            )
+            coords = strongest.get("geometry", {}).get("coordinates", [])
+            if len(coords) >= 3:
+                depth_km = coords[2]
+
         return {
             "recent_events_7d_count": len(features),
             "max_magnitude": max_mag,
+            "max_magnitude_depth_km": depth_km,
             "hazard_level": hazard,
             "search_radius_km": 500,
             "source": "usgs-earthquake",

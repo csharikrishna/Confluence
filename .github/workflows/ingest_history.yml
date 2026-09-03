@@ -1,0 +1,54 @@
+name: Hourly History Ingestion (Phase 2A/2B)
+
+on:
+  schedule:
+    # Once an hour, on the hour
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch registered locations and ingest a fresh snapshot for each
+        run: |
+          TARGET_URL="${{ secrets.RENDER_APP_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            echo "No RENDER_APP_URL secret configured yet. Skipping ingestion."
+            exit 0
+          fi
+
+          echo "Fetching location registry from $TARGET_URL/locations ..."
+          LOCATIONS_JSON=$(curl -s --max-time 15 "$TARGET_URL/locations")
+          if [ -z "$LOCATIONS_JSON" ]; then
+            echo "Empty response from /locations. Aborting."
+            exit 1
+          fi
+
+          echo "$LOCATIONS_JSON" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for loc in data.get('locations', []):
+              print(f\"{loc['lat']}|{loc['lon']}|{loc['name']}\")
+          " > locations.txt
+
+          if [ ! -s locations.txt ]; then
+            echo "No locations parsed from registry. Aborting."
+            exit 1
+          fi
+
+          FAILURES=0
+          while IFS='|' read -r LAT LON NAME; do
+            ENCODED_NAME=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$NAME")
+            echo "Ingesting snapshot for $NAME ($LAT, $LON)..."
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 \
+              "$TARGET_URL/environment?lat=$LAT&lon=$LON&name=$ENCODED_NAME&bypass_cache=true")
+            echo "  -> HTTP $STATUS"
+            if [ "$STATUS" -ne 200 ]; then
+              FAILURES=$((FAILURES + 1))
+            fi
+          done < locations.txt
+
+          echo "Ingestion complete. Failures: $FAILURES"
+          # Don't fail the whole workflow on isolated upstream hiccups for one location.
+          exit 0

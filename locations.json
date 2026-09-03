@@ -1,0 +1,7 @@
+[
+  {"name": "Chennai Coast", "lat": 13.08, "lon": 80.27, "region": "Tamil Nadu, India"},
+  {"name": "Visakhapatnam Coast", "lat": 17.69, "lon": 83.22, "region": "Andhra Pradesh, India"},
+  {"name": "Kochi Coast", "lat": 9.93, "lon": 76.26, "region": "Kerala, India"},
+  {"name": "Mumbai Coast", "lat": 18.94, "lon": 72.84, "region": "Maharashtra, India"},
+  {"name": "Kolkata / Sundarbans Coast", "lat": 21.63, "lon": 88.15, "region": "West Bengal, India"}
+]

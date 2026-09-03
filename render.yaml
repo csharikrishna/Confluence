@@ -11,4 +11,20 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.12.0
+      # Phase 2 (optional, both safe to leave unset):
+      - key: CONFLUENCE_DB_PATH
+        sync: false
+      - key: ALERT_WEBHOOK_URL
+        sync: false
+    # --- Persistent history storage (requires a paid Render plan) ---
+    # Render's free tier has an ephemeral filesystem: confluence_history.db is
+    # wiped on every redeploy, so trend_24h/alert history won't survive across
+    # deploys until this is enabled. To turn it on: upgrade this service off the
+    # free plan, uncomment the block below, and set CONFLUENCE_DB_PATH above to
+    # /var/data/confluence_history.db. Free-tier deploys will fail if this disk
+    # block is active, so it's left commented out rather than defaulted on.
+    # disk:
+    #   name: confluence-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
 
