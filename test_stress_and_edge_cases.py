@@ -145,12 +145,13 @@ def run_tests():
     print("=" * 75)
     print("Querying with timeout = 0.001 seconds...")
     timeout_snapshot = get_environmental_snapshot(lat, lon, name="Timeout Test", timeout=0.001)
+    total_sources = len(timeout_snapshot["data"])
     failed_sources = timeout_snapshot["meta"]["failed_sources"]
-    all_failed = len(failed_sources) == 4
+    all_failed = len(failed_sources) == total_sources
     confidence = timeout_snapshot["meta"]["confidence"]
     timeout_pass = all_failed and ("low — all sources failed" in confidence)
 
-    print(f"    Failed sources ({len(failed_sources)}/4): {failed_sources}")
+    print(f"    Failed sources ({len(failed_sources)}/{total_sources}): {failed_sources}")
     print(f"    Confidence: {confidence}")
     print(f"    Result: {'[PASS]' if timeout_pass else '[FAIL]'}")
 

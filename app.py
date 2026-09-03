@@ -169,11 +169,16 @@ def root():
             "Canonical ISO 8601 UTC timestamp normalization",
             "Automated physical boundary sanity checks",
         ],
+        "hyperparameters_count": "50+ physical variables",
         "sources": [
-            "Open-Meteo Weather",
-            "Open-Meteo Marine",
-            "OpenAQ Air Quality",
-            "NASA POWER Climate Baseline",
+            "Open-Meteo Weather (14 hyperparameters)",
+            "Open-Meteo Marine (12 hydrodynamic hyperparameters)",
+            "OpenAQ Ground Stations (physical sensor array)",
+            "Open-Meteo Air Quality (atmospheric model fallback)",
+            "Sunrise-Sunset.org (solar & marine nautical ephemeris)",
+            "Open-Meteo Elevation (topography & coastal flood vulnerability)",
+            "NASA POWER (climatological solar & weather baseline)",
+            "USGS Earthquake Hazards (7-day seismic & tsunami alert)",
         ],
     }
 

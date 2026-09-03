@@ -97,6 +97,34 @@ def validate_coordinates(lat, lon):
     return True, None
 
 
+WMO_WEATHER_CODES = {
+    0: "Clear sky",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Depositing rime fog",
+    51: "Light drizzle",
+    53: "Moderate drizzle",
+    55: "Dense drizzle",
+    61: "Slight rain",
+    63: "Moderate rain",
+    65: "Heavy rain",
+    71: "Slight snow",
+    73: "Moderate snow",
+    75: "Heavy snow",
+    77: "Snow grains",
+    80: "Slight rain showers",
+    81: "Moderate rain showers",
+    82: "Violent rain showers",
+    85: "Slight snow showers",
+    86: "Heavy snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with slight hail",
+    99: "Thunderstorm with heavy hail",
+}
+
+
 def validate_environmental_data(data):
     """
     Automated sanity-check function (#8):
@@ -108,6 +136,9 @@ def validate_environmental_data(data):
         t = weather.get("temperature_c")
         if t is not None and not (-50.0 <= t <= 60.0):
             warnings.append(f"Temperature {t}°C outside physical bounds (-50 to 60°C)")
+        at = weather.get("apparent_temperature_c")
+        if at is not None and not (-60.0 <= at <= 75.0):
+            warnings.append(f"Apparent temperature {at}°C outside physical bounds (-60 to 75°C)")
         h = weather.get("humidity_pct")
         if h is not None and not (0.0 <= h <= 100.0):
             warnings.append(f"Humidity {h}% outside physical bounds (0 to 100%)")
@@ -117,9 +148,18 @@ def validate_environmental_data(data):
         w = weather.get("wind_speed_kmh")
         if w is not None and w < 0:
             warnings.append(f"Wind speed {w} km/h cannot be negative")
+        g = weather.get("wind_gusts_kmh")
+        if g is not None and g < 0:
+            warnings.append(f"Wind gusts {g} km/h cannot be negative")
         pr = weather.get("precipitation_mm")
         if pr is not None and pr < 0:
             warnings.append(f"Precipitation {pr} mm cannot be negative")
+        uv = weather.get("uv_index")
+        if uv is not None and not (0.0 <= uv <= 25.0):
+            warnings.append(f"UV index {uv} outside physical bounds (0 to 25)")
+        vis = weather.get("visibility_m")
+        if vis is not None and vis < 0:
+            warnings.append(f"Visibility {vis} m cannot be negative")
 
     marine = data.get("marine", {})
     if marine.get("status") == "ok":
@@ -129,6 +169,15 @@ def validate_environmental_data(data):
         wh = marine.get("wave_height_m")
         if wh is not None and wh < 0:
             warnings.append(f"Wave height {wh} m cannot be negative")
+        wwh = marine.get("wind_wave_height_m")
+        if wwh is not None and wwh < 0:
+            warnings.append(f"Wind wave height {wwh} m cannot be negative")
+        swh = marine.get("swell_wave_height_m")
+        if swh is not None and swh < 0:
+            warnings.append(f"Swell wave height {swh} m cannot be negative")
+        cur_vel = marine.get("ocean_current_velocity_kmh")
+        if cur_vel is not None and cur_vel < 0:
+            warnings.append(f"Ocean current velocity {cur_vel} km/h cannot be negative")
 
     aq = data.get("air_quality", {})
     if aq.get("status") == "ok":
@@ -143,11 +192,17 @@ def validate_environmental_data(data):
         if sol is not None and sol < 0:
             warnings.append(f"Solar radiation {sol} kWh/m² cannot be negative")
 
+    terrain = data.get("terrain", {})
+    if terrain.get("status") == "ok":
+        elev = terrain.get("elevation_m")
+        if elev is not None and elev < -500.0:
+            warnings.append(f"Elevation {elev} m is below deepest land depression bounds")
+
     return warnings
 
 
 # ---------------------------------------------------------------------------
-# 1. OPEN-METEO — WEATHER
+# 1. OPEN-METEO — WEATHER (14 HYPERPARAMETERS)
 # ---------------------------------------------------------------------------
 
 def fetch_weather(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.com/v1/forecast"):
@@ -155,8 +210,12 @@ def fetch_weather(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.co
     params = {
         "latitude": lat,
         "longitude": lon,
-        "current": "temperature_2m,wind_speed_10m,wind_direction_10m,"
-                   "relative_humidity_2m,pressure_msl,precipitation",
+        "current": [
+            "temperature_2m", "relative_humidity_2m", "apparent_temperature",
+            "precipitation", "weather_code", "pressure_msl", "surface_pressure",
+            "cloud_cover", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m",
+            "uv_index", "visibility", "is_day"
+        ],
         "timezone": "UTC",
     }
     try:
@@ -165,13 +224,26 @@ def fetch_weather(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.co
         data = r.json()
         current = data.get("current", {})
         latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        w_code = current.get("weather_code")
+        w_desc = WMO_WEATHER_CODES.get(w_code, "Unknown") if w_code is not None else None
+
         return {
             "temperature_c": current.get("temperature_2m"),
+            "apparent_temperature_c": current.get("apparent_temperature"),
             "wind_speed_kmh": current.get("wind_speed_10m"),
+            "wind_gusts_kmh": current.get("wind_gusts_10m"),
             "wind_direction_deg": current.get("wind_direction_10m"),
             "humidity_pct": current.get("relative_humidity_2m"),
             "pressure_hpa": current.get("pressure_msl"),
+            "surface_pressure_hpa": current.get("surface_pressure"),
             "precipitation_mm": current.get("precipitation"),
+            "cloud_cover_pct": current.get("cloud_cover"),
+            "uv_index": current.get("uv_index"),
+            "visibility_m": current.get("visibility"),
+            "weather_code": w_code,
+            "weather_description": w_desc,
+            "is_day": bool(current.get("is_day")) if current.get("is_day") is not None else None,
             "source": "open-meteo",
             "observed_at": normalize_iso_utc(current.get("time")),
             "status": "ok",
@@ -183,7 +255,7 @@ def fetch_weather(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.co
 
 
 # ---------------------------------------------------------------------------
-# 2. OPEN-METEO — MARINE
+# 2. OPEN-METEO — MARINE (12 HYPERPARAMETERS)
 # ---------------------------------------------------------------------------
 
 def fetch_marine(lat, lon, timeout=TIMEOUT, base_url="https://marine-api.open-meteo.com/v1/marine"):
@@ -191,7 +263,13 @@ def fetch_marine(lat, lon, timeout=TIMEOUT, base_url="https://marine-api.open-me
     params = {
         "latitude": lat,
         "longitude": lon,
-        "current": "wave_height,wave_period,wave_direction,sea_surface_temperature",
+        "current": [
+            "wave_height", "wave_period", "wave_direction",
+            "wind_wave_height", "wind_wave_direction", "wind_wave_period",
+            "swell_wave_height", "swell_wave_direction", "swell_wave_period",
+            "ocean_current_velocity", "ocean_current_direction",
+            "sea_surface_temperature"
+        ],
         "timezone": "UTC",
     }
     try:
@@ -212,6 +290,14 @@ def fetch_marine(lat, lon, timeout=TIMEOUT, base_url="https://marine-api.open-me
             "wave_height_m": wh,
             "wave_period_s": current.get("wave_period"),
             "wave_direction_deg": current.get("wave_direction"),
+            "wind_wave_height_m": current.get("wind_wave_height"),
+            "wind_wave_period_s": current.get("wind_wave_period"),
+            "wind_wave_direction_deg": current.get("wind_wave_direction"),
+            "swell_wave_height_m": current.get("swell_wave_height"),
+            "swell_wave_period_s": current.get("swell_wave_period"),
+            "swell_wave_direction_deg": current.get("swell_wave_direction"),
+            "ocean_current_velocity_kmh": current.get("ocean_current_velocity"),
+            "ocean_current_direction_deg": current.get("ocean_current_direction"),
             "note": note,
             "source": "open-meteo-marine",
             "observed_at": normalize_iso_utc(current.get("time")),
@@ -358,8 +444,187 @@ def fetch_air_quality(lat, lon, api_key=None, timeout=TIMEOUT, base_url="https:/
         return {"source": "openaq", "status": "error", "error": str(e), "latency_ms": latency_ms}
 
 
+def fetch_model_air_quality(lat, lon, timeout=TIMEOUT):
+    """
+    Open-Meteo Global Air Quality API (Free, zero API key required).
+    Acts as atmospheric model layer and universal fallback for coordinates
+    where no physical ground station exists (e.g. mid-ocean).
+    """
+    t0 = time.perf_counter()
+    url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": [
+            "pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide", "sulphur_dioxide",
+            "ozone", "aerosol_optical_depth", "dust", "uv_index", "us_aqi", "european_aqi"
+        ],
+        "timezone": "UTC",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=timeout)
+        r.raise_for_status()
+        cur = r.json().get("current", {})
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        pm25 = cur.get("pm2_5")
+        aqi_category = None
+        if pm25 is not None:
+            if pm25 <= 12.0:
+                aqi_category = "good"
+            elif pm25 <= 35.4:
+                aqi_category = "moderate"
+            elif pm25 <= 55.4:
+                aqi_category = "unhealthy for sensitive groups"
+            elif pm25 <= 150.4:
+                aqi_category = "unhealthy"
+            elif pm25 <= 250.4:
+                aqi_category = "very unhealthy"
+            else:
+                aqi_category = "hazardous"
+
+        return {
+            "station_name": "Global CAMS Atmospheric Model (Open-Meteo)",
+            "tier": "atmospheric_model",
+            "pm25": pm25,
+            "pm10": cur.get("pm10"),
+            "o3": cur.get("ozone"),
+            "no2": cur.get("nitrogen_dioxide"),
+            "so2": cur.get("sulphur_dioxide"),
+            "co": cur.get("carbon_monoxide"),
+            "us_aqi": cur.get("us_aqi"),
+            "european_aqi": cur.get("european_aqi"),
+            "dust_ug_m3": cur.get("dust"),
+            "aerosol_optical_depth": cur.get("aerosol_optical_depth"),
+            "aqi_category": aqi_category,
+            "source": "open-meteo-air-quality",
+            "observed_at": normalize_iso_utc(cur.get("time")),
+            "status": "ok",
+            "latency_ms": latency_ms,
+        }
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        return {"source": "open-meteo-air-quality", "status": "error", "error": str(e), "latency_ms": latency_ms}
+
+
 # ---------------------------------------------------------------------------
-# 4. NASA POWER — CLIMATE BASELINE
+# 4. SUNRISE-SUNSET — ASTRONOMICAL & MARINE LIGHTING (FREE, NO KEY)
+# ---------------------------------------------------------------------------
+
+def fetch_sun_and_lighting(lat, lon, timeout=TIMEOUT, base_url="https://api.sunrise-sunset.org/json"):
+    """
+    Sunrise-Sunset.org API: Provides solar ephemeris and nautical twilights
+    essential for fishermen departure schedules and marine operations.
+    """
+    t0 = time.perf_counter()
+    params = {"lat": lat, "lng": lon, "formatted": 0}
+    try:
+        r = requests.get(base_url, params=params, timeout=timeout)
+        r.raise_for_status()
+        res = r.json().get("results", {})
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        day_len_s = res.get("day_length")
+        day_len_hrs = round(day_len_s / 3600.0, 2) if day_len_s else None
+
+        return {
+            "sunrise": res.get("sunrise"),
+            "sunset": res.get("sunset"),
+            "solar_noon": res.get("solar_noon"),
+            "day_length_hours": day_len_hrs,
+            "civil_twilight_begin": res.get("civil_twilight_begin"),
+            "civil_twilight_end": res.get("civil_twilight_end"),
+            "nautical_twilight_begin": res.get("nautical_twilight_begin"),
+            "nautical_twilight_end": res.get("nautical_twilight_end"),
+            "astronomical_twilight_begin": res.get("astronomical_twilight_begin"),
+            "astronomical_twilight_end": res.get("astronomical_twilight_end"),
+            "source": "sunrise-sunset.org",
+            "observed_at": res.get("solar_noon"),
+            "status": "ok",
+            "latency_ms": latency_ms,
+        }
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        return {"source": "sunrise-sunset.org", "status": "error", "error": str(e), "latency_ms": latency_ms}
+
+
+# ---------------------------------------------------------------------------
+# 5. OPEN-METEO — TERRAIN & ELEVATION (FREE, NO KEY)
+# ---------------------------------------------------------------------------
+
+def fetch_elevation(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.com/v1/elevation"):
+    """
+    Open-Meteo Elevation API: Topographic height above sea level for coastal
+    inundation and storm surge vulnerability modeling.
+    """
+    t0 = time.perf_counter()
+    params = {"latitude": lat, "longitude": lon}
+    try:
+        r = requests.get(base_url, params=params, timeout=timeout)
+        r.raise_for_status()
+        elev = r.json().get("elevation", [])
+        elev_m = elev[0] if isinstance(elev, list) and elev else None
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        risk_category = "low-lying (<5m)" if (elev_m is not None and elev_m < 5.0) else "elevated"
+
+        return {
+            "elevation_m": elev_m,
+            "coastal_risk_category": risk_category,
+            "source": "open-meteo-elevation",
+            "status": "ok",
+            "latency_ms": latency_ms,
+        }
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        return {"source": "open-meteo-elevation", "status": "error", "error": str(e), "latency_ms": latency_ms}
+
+
+# ---------------------------------------------------------------------------
+# 6. USGS — SEISMIC & TSUNAMI RISK (FREE, NO KEY)
+# ---------------------------------------------------------------------------
+
+def fetch_seismic_risk(lat, lon, timeout=TIMEOUT, base_url="https://earthquake.usgs.gov/fdsnws/event/1/query"):
+    """
+    USGS Earthquake Hazards API: Queries past 7 days for seismic events (M>=4.0)
+    within 500km to flag coastal seismic / tsunami hazards.
+    """
+    t0 = time.perf_counter()
+    start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    params = {
+        "format": "geojson",
+        "latitude": lat,
+        "longitude": lon,
+        "maxradiuskm": 500,
+        "minmagnitude": 4.0,
+        "starttime": start,
+    }
+    try:
+        r = requests.get(base_url, params=params, timeout=timeout)
+        r.raise_for_status()
+        features = r.json().get("features", [])
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        mags = [f.get("properties", {}).get("mag") for f in features if f.get("properties", {}).get("mag") is not None]
+        max_mag = max(mags) if mags else None
+        hazard = "elevated (M>=6.0 nearby)" if (max_mag and max_mag >= 6.0) else "nominal"
+
+        return {
+            "recent_events_7d_count": len(features),
+            "max_magnitude": max_mag,
+            "hazard_level": hazard,
+            "search_radius_km": 500,
+            "source": "usgs-earthquake",
+            "status": "ok",
+            "latency_ms": latency_ms,
+        }
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        return {"source": "usgs-earthquake", "status": "error", "error": str(e), "latency_ms": latency_ms}
+
+
+# ---------------------------------------------------------------------------
+# 7. NASA POWER — CLIMATE BASELINE
 # ---------------------------------------------------------------------------
 
 def fetch_climate_baseline(lat, lon, timeout=TIMEOUT, base_url="https://power.larc.nasa.gov/api/temporal/daily/point"):
@@ -415,7 +680,7 @@ def fetch_climate_baseline(lat, lon, timeout=TIMEOUT, base_url="https://power.la
 
 
 # ---------------------------------------------------------------------------
-# UNIFIED ENDPOINT LOGIC
+# UNIFIED ENDPOINT LOGIC (CONCURRENT MULTI-DOMAIN FUSION)
 # ---------------------------------------------------------------------------
 
 def get_environmental_snapshot(lat, lon, name="Unnamed Location", timeout=TIMEOUT, openaq_api_key=None, bypass_cache=False):
@@ -445,20 +710,26 @@ def get_environmental_snapshot(lat, lon, name="Unnamed Location", timeout=TIMEOU
 
     t_start = time.perf_counter()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
         f_weather = executor.submit(fetch_weather, lat, lon, timeout=timeout)
         f_marine = executor.submit(fetch_marine, lat, lon, timeout=timeout)
         f_aq = executor.submit(fetch_air_quality, lat, lon, api_key=openaq_api_key, timeout=timeout)
+        f_sun = executor.submit(fetch_sun_and_lighting, lat, lon, timeout=timeout)
+        f_elevation = executor.submit(fetch_elevation, lat, lon, timeout=timeout)
         f_climate = executor.submit(fetch_climate_baseline, lat, lon, timeout=timeout)
+        f_seismic = executor.submit(fetch_seismic_risk, lat, lon, timeout=timeout)
 
         weather = f_weather.result()
         marine = f_marine.result()
         air_quality = f_aq.result()
+        sun_and_lighting = f_sun.result()
+        terrain = f_elevation.result()
         climate_baseline = f_climate.result()
+        seismic_risk = f_seismic.result()
 
     total_latency_ms = round((time.perf_counter() - t_start) * 1000, 2)
 
-    sources = [weather, marine, air_quality, climate_baseline]
+    sources = [weather, marine, air_quality, sun_and_lighting, terrain, climate_baseline, seismic_risk]
     failed = [s["source"] for s in sources if s.get("status") == "error"]
 
     if not failed:
@@ -472,7 +743,10 @@ def get_environmental_snapshot(lat, lon, name="Unnamed Location", timeout=TIMEOU
         "weather": weather,
         "marine": marine,
         "air_quality": air_quality,
+        "sun_and_lighting": sun_and_lighting,
+        "terrain": terrain,
         "climate_baseline": climate_baseline,
+        "seismic_risk": seismic_risk,
     }
 
     meta = {

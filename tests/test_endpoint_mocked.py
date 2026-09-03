@@ -18,6 +18,10 @@ from env_intelligence_test import (
     fetch_weather,
     fetch_marine,
     fetch_air_quality,
+    fetch_model_air_quality,
+    fetch_sun_and_lighting,
+    fetch_elevation,
+    fetch_seismic_risk,
     fetch_climate_baseline,
     validate_coordinates,
     validate_environmental_data,
@@ -322,7 +326,90 @@ class TestEnvironmentalIntelligence(unittest.TestCase):
         self.assertEqual(snapshot["meta"]["failed_sources"], ["openaq"])
         self.assertIn("partial", snapshot["meta"]["confidence"])
 
+    # -----------------------------------------------------------------------
+    # Tests for New Free Endpoints (Sun, Elevation, Seismic, Model AQ)
+    # -----------------------------------------------------------------------
+
+    @patch("requests.get")
+    def test_mocked_fetch_model_air_quality(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "current": {
+                "time": "2026-09-03T11:00",
+                "pm10": 32.0,
+                "pm2_5": 21.5,
+                "carbon_monoxide": 280.0,
+                "nitrogen_dioxide": 8.5,
+                "sulphur_dioxide": 6.2,
+                "ozone": 120.0,
+                "dust": 5.0,
+                "aerosol_optical_depth": 0.35,
+                "us_aqi": 75,
+                "european_aqi": 60,
+            }
+        }
+        mock_get.return_value = mock_resp
+
+        result = fetch_model_air_quality(13.08, 80.27)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["pm25"], 21.5)
+        self.assertEqual(result["us_aqi"], 75)
+        self.assertEqual(result["tier"], "atmospheric_model")
+
+    @patch("requests.get")
+    def test_mocked_fetch_sun_and_lighting(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "results": {
+                "sunrise": "2026-09-03T00:26:46+00:00",
+                "sunset": "2026-09-03T12:49:55+00:00",
+                "solar_noon": "2026-09-03T06:38:21+00:00",
+                "day_length": 44589,
+                "nautical_twilight_begin": "2026-09-02T23:41:23+00:00",
+                "nautical_twilight_end": "2026-09-03T13:35:18+00:00",
+            }
+        }
+        mock_get.return_value = mock_resp
+
+        result = fetch_sun_and_lighting(13.08, 80.27)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["day_length_hours"], 12.39)
+        self.assertIn("2026-09-03T00:26:46", result["sunrise"])
+
+    @patch("requests.get")
+    def test_mocked_fetch_elevation(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"elevation": [8.5]}
+        mock_get.return_value = mock_resp
+
+        result = fetch_elevation(13.08, 80.27)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["elevation_m"], 8.5)
+        self.assertEqual(result["coastal_risk_category"], "elevated")
+
+    @patch("requests.get")
+    def test_mocked_fetch_seismic_risk(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "features": [
+                {"properties": {"mag": 4.5}},
+                {"properties": {"mag": 5.1}},
+            ]
+        }
+        mock_get.return_value = mock_resp
+
+        result = fetch_seismic_risk(13.08, 80.27)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["recent_events_7d_count"], 2)
+        self.assertEqual(result["max_magnitude"], 5.1)
+        self.assertEqual(result["hazard_level"], "nominal")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
