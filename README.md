@@ -2,13 +2,24 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/Tests-28%2F28%20Passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-32%20Total%20(28%20Offline%20%2B%204%20Remote)-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Render](https://img.shields.io/badge/Deploy-Render-46E3B7.svg?logo=render&logoColor=white)](render.yaml)
+[![Render](https://img.shields.io/badge/Deploy-Render-46E3B7.svg?logo=render&logoColor=white)](https://confluence-si41.onrender.com)
 
 A high-performance, normalized API that concurrently aggregates **50+ physical, marine, and atmospheric hyperparameters** across **7 free public APIs** into a single validated JSON snapshot.
 
 Engineered specifically to **ground frontier AI models** (Nemotron, Llama 3.2, GPT-4o, Claude) and maritime decision systems in empirical, real-time physical truth—eliminating weather hallucinations and enabling high-stakes operational safety advisories.
+
+---
+
+## 🌐 Live Production Service
+
+The API is deployed on Render and serving live data:
+
+- **Live Service Base URL**: [`https://confluence-si41.onrender.com`](https://confluence-si41.onrender.com)
+- **Interactive OpenAPI / Swagger Docs**: [`https://confluence-si41.onrender.com/docs`](https://confluence-si41.onrender.com/docs)
+- **Health Probe**: [`https://confluence-si41.onrender.com/health`](https://confluence-si41.onrender.com/health)
+- **Sample Production Query**: [`/environment?lat=13.08&lon=80.27&name=Chennai%20Coast`](https://confluence-si41.onrender.com/environment?lat=13.08&lon=80.27&name=Chennai%20Coast)
 
 ---
 
@@ -73,9 +84,15 @@ Copy the example environment file:
 ```bash
 cp .env.example .env
 ```
-Edit `.env` to supply your free OpenAQ key:
+Edit `.env` to configure your keys:
 ```env
+# OpenAQ API Key (Free tier key from https://openaq.org/)
 OPENAQ_API_KEY=your_openaq_api_key_here
+
+# NVIDIA NIM API Key (Optional, for frontier model grounding tests)
+NVIDIA_API_KEY=your_nvidia_api_key_here
+
+# Server Port
 PORT=8000
 ```
 
@@ -109,35 +126,36 @@ Fetches the normalized, multi-domain environmental intelligence snapshot.
     "lat": 13.08,
     "lon": 80.27
   },
-  "generated_at": "2026-09-03T11:12:23Z",
+  "generated_at": "2026-09-03T11:30:29Z",
   "data": {
     "weather": {
-      "temperature_c": 31.9,
+      "temperature_c": 31.5,
       "apparent_temperature_c": 36.0,
-      "wind_speed_kmh": 12.2,
-      "wind_gusts_kmh": 35.3,
-      "humidity_pct": 62,
-      "pressure_hpa": 1005.5,
+      "wind_speed_kmh": 10.4,
+      "wind_gusts_kmh": 32.8,
+      "humidity_pct": 64,
+      "pressure_hpa": 1005.7,
       "precipitation_mm": 0.1,
-      "uv_index": 0.55,
-      "visibility_m": 4380.0,
+      "uv_index": 0.25,
+      "visibility_m": 6620.0,
       "weather_code": 51,
       "weather_description": "Light drizzle",
       "is_day": true,
       "source": "open-meteo",
-      "observed_at": "2026-09-03T11:00:00Z",
+      "observed_at": "2026-09-03T11:30:00Z",
       "status": "ok"
     },
     "marine": {
       "sea_surface_temp_c": 30.6,
       "wave_height_m": 0.78,
-      "wave_period_s": 8.9,
-      "wind_wave_height_m": 0.22,
+      "wave_period_s": 8.75,
+      "wind_wave_height_m": 0.24,
       "swell_wave_height_m": 0.60,
       "ocean_current_velocity_kmh": 1.1,
-      "ocean_current_direction_deg": 9,
+      "ocean_current_direction_deg": 18,
       "note": null,
       "source": "open-meteo-marine",
+      "observed_at": "2026-09-03T11:30:00Z",
       "status": "ok"
     },
     "air_quality": {
@@ -146,15 +164,20 @@ Fetches the normalized, multi-domain environmental intelligence snapshot.
       "pm10": 51.8,
       "o3": 28.06,
       "no2": 11.4,
+      "so2": 4.56,
+      "co": 1.26,
       "aqi_category": "moderate",
       "source": "openaq",
+      "observed_at": "2026-09-02T10:30:00Z",
       "status": "ok"
     },
     "sun_and_lighting": {
       "sunrise": "2026-09-03T00:26:46+00:00",
       "sunset": "2026-09-03T12:49:55+00:00",
+      "solar_noon": "2026-09-03T06:38:21+00:00",
       "day_length_hours": 12.39,
       "nautical_twilight_begin": "2026-09-02T23:41:23+00:00",
+      "nautical_twilight_end": "2026-09-03T13:35:18+00:00",
       "source": "sunrise-sunset.org",
       "status": "ok"
     },
@@ -167,12 +190,16 @@ Fetches the normalized, multi-domain environmental intelligence snapshot.
     "climate_baseline": {
       "solar_radiation_kwh_m2": 6.01,
       "avg_temperature_c": 30.82,
+      "avg_wind_speed_ms": 3.74,
       "source": "nasa-power",
+      "observed_at": "2026-08-28T00:00:00Z",
       "status": "ok"
     },
     "seismic_risk": {
       "recent_events_7d_count": 0,
+      "max_magnitude": null,
       "hazard_level": "nominal",
+      "search_radius_km": 500,
       "source": "usgs-earthquake",
       "status": "ok"
     }
@@ -190,14 +217,37 @@ Fetches the normalized, multi-domain environmental intelligence snapshot.
 
 ## 🧪 Automated Testing
 
-Confluence includes a comprehensive offline test suite with mocked network responses, boundary validation, and API tests:
+Confluence includes three dedicated test suites covering offline mock unit tests, live remote verification, and failure isolation:
 
+### 1. Offline Unit & Mocked Integration Suite (28 Tests)
+Validates boundary sanity checks, canonical ISO UTC normalization, coordinate validation, and isolated failure degradation without external network calls:
 ```bash
-pytest tests/ -v
+pytest tests/test_api.py tests/test_caching_and_ratelimit.py tests/test_endpoint_mocked.py -v
+```
+```text
+======================== 28 passed in 3.56s ========================
 ```
 
+### 2. Live Remote Deployment Suite (4 Tests)
+Targets the live deployed service to verify real-world connectivity, CORS headers, cache hits, and 400 bad-request handling *(automatically skipped when running offline)*:
+```bash
+# On Windows (PowerShell):
+$env:API_BASE_URL="https://confluence-si41.onrender.com"; pytest tests/test_live_remote.py -v
+
+# On Linux / macOS:
+API_BASE_URL="https://confluence-si41.onrender.com" pytest tests/test_live_remote.py -v
 ```
-======================== 28 passed in 3.56s ========================
+```text
+============================== 4 passed in 3.92s ==============================
+```
+
+### 3. 7-Way Failure-Isolation Stress Suite
+Executes 7 independent failure-isolation runs, killing each upstream source individually to verify graceful degradation:
+```bash
+python test_stress_and_edge_cases.py
+```
+```text
+OVERALL STRESS-TEST RESULT: ALL PASS [100%]
 ```
 
 ---
@@ -208,8 +258,15 @@ This repository includes a pre-configured [render.yaml](render.yaml) and [Procfi
 
 1. Fork or push this repository to GitHub.
 2. In **[Render](https://dashboard.render.com/)**, click **New +** $\rightarrow$ **Blueprint** and select this repo.
-3. Set `OPENAQ_API_KEY` in Render's environment settings.
+3. Set `OPENAQ_API_KEY` (and optional `NVIDIA_API_KEY`) in Render's environment settings.
 4. Add your deployed URL to GitHub Secrets as `RENDER_APP_URL` to enable the keep-alive cron workflow.
+
+---
+
+## 📚 Documentation & Project History
+
+- **Historical Phase 1 Pilot Specification**: [docs/phase1-planning-archive.md](docs/phase1-planning-archive.md)
+- **Frontier LLM Grounding PoC**: [test_multi_model_and_conditions.py](test_multi_model_and_conditions.py)
 
 ---
 
