@@ -7,6 +7,7 @@ partial failure handling, and latency logging completely offline.
 import os
 import sys
 import unittest
+import requests
 from unittest.mock import patch, MagicMock
 
 # Ensure project root is on sys.path
@@ -270,6 +271,58 @@ class TestEnvironmentalIntelligence(unittest.TestCase):
         self.assertEqual(snapshot["data"]["weather"]["status"], "ok")
         self.assertEqual(snapshot["data"]["air_quality"]["status"], "error")
 
+    # -----------------------------------------------------------------------
+    # Tests for Malformed & Non-JSON Upstream Responses (Gap #3)
+    # -----------------------------------------------------------------------
+
+    @patch("requests.get")
+    def test_mocked_fetch_air_quality_html_502_error(self, mock_get):
+        # Simulate Cloudflare HTML 502 Bad Gateway response
+        mock_resp = MagicMock()
+        mock_resp.status_code = 502
+        mock_resp.text = "<html><body><h1>502 Bad Gateway</h1><p>Cloudflare</p></body></html>"
+        mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError("502 Server Error: Bad Gateway")
+        mock_get.return_value = mock_resp
+
+        result = fetch_air_quality(13.08, 80.27, api_key="test_key")
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["source"], "openaq")
+        self.assertIn("502 Server Error", result["error"])
+
+    @patch("requests.get")
+    def test_mocked_fetch_air_quality_malformed_non_json_200(self, mock_get):
+        # Simulate upstream returning HTTP 200 but corrupted non-JSON text
+        import json
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "Error: Upstream database connection timeout occurred"
+        mock_resp.json.side_effect = json.decoder.JSONDecodeError("Expecting value", mock_resp.text, 0)
+        mock_get.return_value = mock_resp
+
+        result = fetch_air_quality(13.08, 80.27, api_key="test_key")
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["source"], "openaq")
+        self.assertIn("Expecting value", result["error"])
+
+    @patch("env_intelligence_test.fetch_weather")
+    @patch("env_intelligence_test.fetch_marine")
+    @patch("env_intelligence_test.fetch_air_quality")
+    @patch("env_intelligence_test.fetch_climate_baseline")
+    def test_snapshot_malformed_upstream_does_not_crash_pipeline(self, mock_climate, mock_aq, mock_marine, mock_weather):
+        # Simulate weather, marine, climate ok; OpenAQ returns corrupted error
+        mock_weather.return_value = {"source": "open-meteo", "status": "ok", "temperature_c": 31.0, "latency_ms": 100}
+        mock_marine.return_value = {"source": "open-meteo-marine", "status": "ok", "wave_height_m": 0.9, "latency_ms": 110}
+        mock_aq.return_value = {"source": "openaq", "status": "error", "error": "JSONDecodeError: Expecting value: line 1 column 1", "latency_ms": 250}
+        mock_climate.return_value = {"source": "nasa-power", "status": "ok", "solar_radiation_kwh_m2": 5.2, "observed_at": "2026-08-28T00:00:00Z", "latency_ms": 120}
+
+        # Must NOT raise unhandled exception
+        snapshot = get_environmental_snapshot(13.08, 80.27, bypass_cache=True)
+        self.assertEqual(snapshot["data"]["weather"]["status"], "ok")
+        self.assertEqual(snapshot["data"]["air_quality"]["status"], "error")
+        self.assertEqual(snapshot["meta"]["failed_sources"], ["openaq"])
+        self.assertIn("partial", snapshot["meta"]["confidence"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

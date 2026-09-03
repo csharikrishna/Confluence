@@ -14,10 +14,14 @@ Exposes:
   GET /
 """
 
+import os
 import sys
 import time
+import asyncio
 import logging
+import requests
 from typing import Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Query, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,6 +48,48 @@ logger = logging.getLogger("environmental_api")
 # Rate Limiter: 30 requests/minute per client IP
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. Startup: Pre-warm station metadata and snapshot cache for Chennai Coast (13.08, 80.27)
+    logger.info("Initializing API: Pre-warming caches for Chennai Coast (13.08, 80.27)...")
+    try:
+        def _prewarm():
+            try:
+                get_environmental_snapshot(lat=13.08, lon=80.27, name="Chennai Coast", bypass_cache=True)
+                logger.info("Startup pre-warming successful: STATION_CACHE and SNAPSHOT_CACHE populated.")
+            except Exception as e:
+                logger.warning(f"Startup pre-warming encountered issue: {e}")
+
+        loop = asyncio.get_running_loop()
+        loop.run_in_executor(None, _prewarm)
+    except Exception as e:
+        logger.warning(f"Startup pre-warming deferred: {e}")
+
+    # 2. Keep-alive task to prevent free-tier hosts (e.g. Render 15-min idle spin-down)
+    render_url = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("APP_URL")
+    keep_alive_task = None
+    if render_url:
+        logger.info(f"Keep-alive enabled for public host: {render_url}")
+
+        async def _keep_alive():
+            while True:
+                await asyncio.sleep(720)  # Ping every 12 minutes
+                try:
+                    r = requests.get(f"{render_url.rstrip('/')}/health", timeout=10)
+                    logger.info(f"Self-ping keep-alive sent to {render_url}/health — status: {r.status_code}")
+                except Exception as ex:
+                    logger.warning(f"Keep-alive ping failed: {ex}")
+
+        keep_alive_task = asyncio.create_task(_keep_alive())
+
+    yield
+
+    if keep_alive_task:
+        keep_alive_task.cancel()
+    logger.info("API shutdown complete.")
+
+
 app = FastAPI(
     title="Unified Environmental Intelligence API",
     description=(
@@ -52,6 +98,7 @@ app = FastAPI(
         "and serves it as a single JSON response for frontier AI models and coastal risk applications."
     ),
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.state.limiter = limiter
