@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: environmental-intelligence-api
+    name: confluence
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
@@ -11,3 +11,4 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.12.0
+
