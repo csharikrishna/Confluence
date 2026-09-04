@@ -243,6 +243,29 @@ class TestPruneOldSnapshots(unittest.TestCase):
         self.assertEqual(cdb.prune_old_snapshots(), 0)
 
 
+class TestPruneOldAlerts(unittest.TestCase):
+    """alerts_log needs the same retention pruning as snapshots — without it,
+    the alerts database grows unbounded forever.
+    """
+
+    @patch("couchdb_storage.requests.post")
+    def test_prune_bulk_deletes_stale_alert_docs(self, mock_post):
+        stale_docs = [{"_id": "alert:13.08:80.27:pm25_unhealthy:old1", "_rev": "1-abc"}]
+        mock_post.side_effect = [_mock_response(200, {"docs": stale_docs}), _mock_response(201, [{"ok": True}])]
+
+        deleted = cdb.prune_old_alerts(retention_days=90)
+        self.assertEqual(deleted, 1)
+
+        _, kwargs = mock_post.call_args
+        bulk_docs = kwargs["json"]["docs"]
+        self.assertTrue(all(d["_deleted"] is True for d in bulk_docs))
+
+    @patch("couchdb_storage.requests.post")
+    def test_prune_no_stale_alerts_returns_zero(self, mock_post):
+        mock_post.return_value = _mock_response(200, {"docs": []})
+        self.assertEqual(cdb.prune_old_alerts(), 0)
+
+
 class TestIsHealthy(unittest.TestCase):
     @patch("couchdb_storage.requests.get")
     def test_healthy_on_200(self, mock_get):

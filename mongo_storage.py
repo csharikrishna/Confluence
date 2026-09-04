@@ -38,6 +38,14 @@ try:
     _PYMONGO_AVAILABLE = True
 except ImportError:
     _PYMONGO_AVAILABLE = False
+    # Fall back to pymongo's actual underlying sort-direction values (a stable
+    # part of the MongoDB wire protocol, not pymongo-specific) so functions
+    # that reference ASCENDING/DESCENDING at module scope don't raise a
+    # confusing NameError when pymongo isn't installed — they still correctly
+    # fail with the clear RuntimeError from _require_pymongo() instead, at the
+    # point where a real (unmocked) DB call is actually attempted.
+    ASCENDING = 1
+    DESCENDING = -1
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "confluence")
@@ -115,6 +123,10 @@ def init_db():
         prune_old_snapshots()
     except Exception:
         pass
+    try:
+        prune_old_alerts()
+    except Exception:
+        pass
 
 
 def save_snapshot(lat, lon, name, snapshot):
@@ -163,8 +175,12 @@ def get_reading_hours_ago(lat, lon, hours_ago, tolerance_hours=1.5):
     return (closest.get("snapshot") or {}).get("data")
 
 
-def compute_trend_24h(lat, lon, current_data):
-    past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=3)
+def compute_trend_24h(lat, lon, current_data, past=None):
+    """`past` lets a caller reuse an already-fetched 24h-ago reading instead of
+    triggering a second identical Atlas round-trip in the same request.
+    """
+    if past is None:
+        past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=3)
     if not past:
         return None
 
@@ -188,10 +204,11 @@ def compute_trend_24h(lat, lon, current_data):
     return trend or None
 
 
-def get_pressure_change_24h(lat, lon, current_pressure_hpa, tolerance_hours=3):
+def get_pressure_change_24h(lat, lon, current_pressure_hpa, tolerance_hours=3, past=None):
     if current_pressure_hpa is None:
         return None
-    past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=tolerance_hours)
+    if past is None:
+        past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=tolerance_hours)
     past_pressure = get_path(past, "weather.pressure_hpa") if past else None
     if past_pressure is None:
         return None
@@ -242,6 +259,15 @@ def get_alert_history(lat=None, lon=None, limit=100):
 def prune_old_snapshots(retention_days=DEFAULT_RETENTION_DAYS):
     cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     result = _snapshots().delete_many({"timestamp": {"$lt": cutoff}})
+    return result.deleted_count
+
+
+def prune_old_alerts(retention_days=DEFAULT_RETENTION_DAYS):
+    """alerts_log has no equivalent of prune_old_snapshots without this — the
+    log would otherwise grow unbounded forever.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    result = _alerts().delete_many({"triggered_at": {"$lt": cutoff}})
     return result.deleted_count
 
 

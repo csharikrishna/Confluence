@@ -36,5 +36,6 @@ get_pressure_change_24h = _active.get_pressure_change_24h
 log_alert = _active.log_alert
 get_alert_history = _active.get_alert_history
 prune_old_snapshots = _active.prune_old_snapshots
+prune_old_alerts = _active.prune_old_alerts
 is_healthy = _active.is_healthy
 DB_PATH = _active.DB_PATH

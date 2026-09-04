@@ -1,10 +1,11 @@
 """
 Optional Google Drive backup — a disaster-recovery convenience, NOT a live
-database. Whatever storage backend is active (storage.py/SQLite or
-couchdb_storage.py/CouchDB, see db_backend.py) remains the actual source of
-truth this app reads and writes on every request. This module just uploads a
-periodic point-in-time JSON export of recent history to a Drive folder, so
-there's an off-platform copy if the primary store is ever lost.
+database. Whatever storage backend is active (storage.py/SQLite,
+mongo_storage.py/MongoDB, or couchdb_storage.py/CouchDB — see db_backend.py)
+remains the actual source of truth this app reads and writes on every
+request. This module just uploads a periodic point-in-time JSON export of
+recent history to a Drive folder, so there's an off-platform copy if the
+primary store is ever lost.
 
 Fully inert unless GDRIVE_ENABLED=true AND credentials are configured. The
 google-api-python-client / google-auth libraries are imported lazily inside

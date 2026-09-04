@@ -1,4 +1,4 @@
-# 🌊 Confluence — Unified Environmental Intelligence API
+# Confluence — Unified Environmental Intelligence API
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python&logoColor=white)](https://python.org)
@@ -7,128 +7,168 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Render](https://img.shields.io/badge/Deploy-Render-46E3B7.svg?logo=render&logoColor=white)](https://confluence-si41.onrender.com)
 
-A high-performance, normalized API that concurrently aggregates **50+ physical, marine, and atmospheric hyperparameters** across **7 free public APIs** into a single validated JSON snapshot — then connects those raw numbers into **physics-informed composite signals** (heat index, sea state, storm potential, coastal flood risk) and a **config-driven alerting layer**, backed by persisted history across a **multi-location registry**.
+A normalized API that concurrently aggregates **50+ physical, marine, and atmospheric hyperparameters** across **7 free public data sources** into a single validated JSON snapshot — then connects those raw numbers into **physics-informed composite signals** (heat index, sea state, storm potential, coastal flood risk) and a **config-driven alerting layer**, backed by persisted history across a **multi-location registry**.
 
-Engineered specifically to **ground frontier AI models** (Nemotron, Llama 3.2, GPT-4o, Claude) and maritime decision systems in empirical, real-time physical truth—eliminating weather hallucinations and enabling high-stakes operational safety advisories.
+Built to **ground frontier AI models** and maritime decision systems in empirical, real-time physical truth — reducing weather hallucinations and enabling operational safety advisories that cite verified observations instead of training-data priors.
 
-**Phase 2 (current):** History & trends, multi-location support, and a rule-based reasoning layer are live — see [§ Phase 2](#-phase-2--history-trends--alerting) below. See [docs/phase2-plan.md](docs/phase2-plan.md) for the design doc this was built from.
-
----
-
-## 🌐 Live Production Service
-
-The API is deployed on Render and serving live data:
-
-- **Live Service Base URL**: [`https://confluence-si41.onrender.com`](https://confluence-si41.onrender.com)
-- **Interactive OpenAPI / Swagger Docs**: [`https://confluence-si41.onrender.com/docs`](https://confluence-si41.onrender.com/docs)
-- **Health Probe**: [`https://confluence-si41.onrender.com/health`](https://confluence-si41.onrender.com/health)
-- **Sample Production Query**: [`/environment?lat=13.08&lon=80.27&name=Chennai%20Coast`](https://confluence-si41.onrender.com/environment?lat=13.08&lon=80.27&name=Chennai%20Coast)
+**Current status: Phase 2.** History and trends, multi-location support, and a rule-based reasoning layer are live — see [Phase 2: History, Trends & Alerting](#phase-2--history-trends--alerting) below, and [`docs/phase2-plan.md`](docs/phase2-plan.md) for the design doc it was built from.
 
 ---
 
-## 🚀 Key Highlights
+## Contents
 
-- **50+ Hyperparameters Across 7 Free APIs**: Ingests atmospheric weather, sea state hydrodynamics, dual-tier air quality, solar/nautical twilight ephemeris, topography/elevation, climate baselines, and recent seismic events.
-- **Concurrent Execution Pipeline**: Dispatches all upstream requests simultaneously via `concurrent.futures.ThreadPoolExecutor(max_workers=7)`. Total latency is governed by the single slowest source (~2.6s) rather than sequential accumulation (~10s)—a **73% speedup**.
-- **Two-Tier Smart Caching**:
-  - **Station Metadata Cache (24h TTL)**: Eliminates spatial discovery round-trips for ground stations.
-  - **Response Snapshot Cache (5m TTL)**: Returns warm repeated queries in **0.5 ms** with `bypass_cache=true` override.
-- **Render Keep-Alive & Pre-Warming**:
-  - Automatically pre-warms cache on startup.
-  - Includes a GitHub Actions cron ping (`.github/workflows/keep_alive.yml`) to prevent free-tier 15-minute idle spin-down.
-- **Data Quality Sentinel**: Automated boundary validator that flags non-physical values (e.g. negative wave heights, humidity >100%, out-of-bound pressure) before returning data.
-- **Production Hardened**: SlowAPI rate limiting (30 req/min per IP), global exception interceptor (no stack trace leaks), request latency logging, and 100% clean secrets hygiene.
+- [Live service](#live-service)
+- [Highlights](#highlights)
+- [Data sources](#data-sources)
+- [Why this matters](#why-this-matters)
+- [Quickstart](#quickstart)
+- [Project structure](#project-structure)
+- [API reference](#api-reference)
+- [Phase 2: history, trends & alerting](#phase-2--history-trends--alerting)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Limitations & production readiness](#limitations--production-readiness)
+- [Documentation](#documentation)
+- [License](#license)
 
 ---
 
-## 📊 The 7 Integrated Free APIs & 50+ Parameters
+## Live service
 
-| Domain | Integrated Service | Key / Tier | Hyperparameters Ingested |
+- **Base URL**: [`https://confluence-si41.onrender.com`](https://confluence-si41.onrender.com)
+- **Interactive docs (Swagger)**: [`/docs`](https://confluence-si41.onrender.com/docs)
+- **Health probe**: [`/health`](https://confluence-si41.onrender.com/health)
+- **Sample query**: [`/environment?lat=13.08&lon=80.27&name=Chennai%20Coast`](https://confluence-si41.onrender.com/environment?lat=13.08&lon=80.27&name=Chennai%20Coast)
+
+---
+
+## Highlights
+
+- **50+ hyperparameters across 7 free APIs** — atmospheric weather, sea-state hydrodynamics, dual-tier air quality, solar/nautical twilight ephemeris, topography/elevation, climate baselines, and recent seismic events.
+- **Concurrent fan-out** — all 7 upstream sources are dispatched simultaneously via `ThreadPoolExecutor`, so total latency is bounded by the single slowest source (~2.6s) rather than the sum of all seven (~10s).
+- **Two-tier caching** — a 24h station-metadata cache eliminates redundant spatial discovery, and a 5-minute response cache serves repeated queries in well under a millisecond (`bypass_cache=true` to force a fresh fetch).
+- **Data-quality sentinel** — every response is checked against physical boundaries (no negative wave heights, no >100% humidity, no out-of-range pressure) before it's returned.
+- **Production-hardened** — rate limiting, a global exception handler that never leaks stack traces, structured request logging, and a CI gate that runs the full test suite on every push.
+- **Physics-informed reasoning layer** — composite signals (heat index, sea state, storm potential, coastal flood risk, tsunami advisory) computed from cited meteorological/oceanographic standards, plus a config-driven alerting engine — see [Phase 2](#phase-2--history-trends--alerting).
+- **Pluggable, verified storage** — SQLite by default, with MongoDB Atlas or CouchDB as drop-in durable backends, each verified against a real running instance, not just mocks.
+
+---
+
+## Data sources
+
+| Domain | Service | Access | Hyperparameters |
 | :--- | :--- | :--- | :--- |
-| **1. Weather & Atmosphere** | **Open-Meteo Forecast** | 100% Free, **No Key** | `temperature_c`, `apparent_temperature_c` (feels-like), `wind_speed_kmh`, `wind_gusts_kmh` (squall gusts), `wind_direction_deg`, `humidity_pct`, `pressure_hpa`, `surface_pressure_hpa`, `precipitation_mm`, `cloud_cover_pct`, `uv_index`, `visibility_m`, `weather_code` (WMO), `weather_description`, `is_day` |
-| **2. Ocean Hydrodynamics** | **Open-Meteo Marine** | 100% Free, **No Key** | `sea_surface_temp_c`, `wave_height_m`, `wave_period_s`, `wave_direction_deg`, `wind_wave_height_m`, `wind_wave_period_s`, `wind_wave_direction_deg`, `swell_wave_height_m`, `swell_wave_period_s`, `swell_wave_direction_deg`, `ocean_current_velocity_kmh`, `ocean_current_direction_deg`, `note` (landlocked detection) |
-| **3. Air Quality & Chemistry** | **OpenAQ** + **Open-Meteo Fallback** | Free Tier (`OpenAQ`) / Free, **No Key** (`Open-Meteo`) | `pm25`, `pm10`, `o3`, `no2`, `so2`, `co`, `aqi_category` (EPA standard), `us_aqi`, `european_aqi`, `dust_ug_m3`, `aerosol_optical_depth`, `tier` (`ground_sensor` or `atmospheric_model`) |
-| **4. Astronomical & Marine Lighting** | **Sunrise-Sunset.org** | 100% Free, **No Key** | `sunrise`, `sunset`, `solar_noon`, `day_length_hours`, `civil_twilight_begin`, `civil_twilight_end`, `nautical_twilight_begin` (mariner departure threshold), `nautical_twilight_end`, `astronomical_twilight_begin`, `astronomical_twilight_end` |
-| **5. Topography & Elevation** | **Open-Meteo Elevation** | 100% Free, **No Key** | `elevation_m` (meters above sea level), `coastal_risk_category` (`low-lying (<5m)` storm surge vulnerability vs `elevated`) |
-| **6. Climate Baseline** | **NASA POWER** | 100% Free, **No Key** | `solar_radiation_kwh_m2`, `avg_temperature_c`, `avg_wind_speed_ms`, `observed_at` |
-| **7. Seismic & Tsunami Risk** | **USGS Earthquakes** | 100% Free, **No Key** | `recent_events_7d_count` (past 7d within 500km), `max_magnitude`, `hazard_level` (`nominal` or `elevated`), `search_radius_km` |
+| Weather & atmosphere | Open-Meteo Forecast | Free, no key | `temperature_c`, `apparent_temperature_c`, `wind_speed_kmh`, `wind_gusts_kmh`, `wind_direction_deg`, `humidity_pct`, `pressure_hpa`, `surface_pressure_hpa`, `precipitation_mm`, `cloud_cover_pct`, `uv_index`, `visibility_m`, `weather_code` (WMO), `weather_description`, `is_day` |
+| Ocean hydrodynamics | Open-Meteo Marine | Free, no key | `sea_surface_temp_c`, `wave_height_m`, `wave_period_s`, `wave_direction_deg`, `wind_wave_height_m`, `wind_wave_period_s`, `wind_wave_direction_deg`, `swell_wave_height_m`, `swell_wave_period_s`, `swell_wave_direction_deg`, `ocean_current_velocity_kmh`, `ocean_current_direction_deg` |
+| Air quality & chemistry | OpenAQ + Open-Meteo fallback | Free tier / free, no key | `pm25`, `pm10`, `o3`, `no2`, `so2`, `co`, `aqi_category` (EPA), `us_aqi`, `european_aqi`, `dust_ug_m3`, `aerosol_optical_depth`, `tier` (`ground_sensor` or `atmospheric_model`) |
+| Astronomical & marine lighting | Sunrise-Sunset.org | Free, no key | `sunrise`, `sunset`, `solar_noon`, `day_length_hours`, civil/nautical/astronomical twilight begin/end |
+| Topography & elevation | Open-Meteo Elevation | Free, no key | `elevation_m`, `coastal_risk_category` (`low-lying (<5m)` vs `elevated`) |
+| Climate baseline | NASA POWER | Free, no key | `solar_radiation_kwh_m2`, `avg_temperature_c`, `avg_wind_speed_ms`, `observed_at` |
+| Seismic & tsunami risk | USGS Earthquakes | Free, no key | `recent_events_7d_count`, `max_magnitude`, `max_magnitude_depth_km`, `hazard_level`, `search_radius_km` |
 
 ---
 
-## 🔬 Scientific Grounding Proof: Why This Matters
+## Why this matters
 
-When frontier LLMs are asked operational coastal questions without this endpoint, they either hallucinate seasonal stereotypes or admit total blindness. Grounding them in this unified snapshot transforms their capability:
+Frontier LLMs asked operational coastal questions without grounding either hallucinate seasonal stereotypes or admit total blindness. A unified, verified snapshot changes that:
 
-| Environmental Scenario | Raw Observations | Ungrounded Frontier LLM Response | Grounded Model with Confluence Endpoint |
+| Scenario | Raw observations | Ungrounded response | Grounded response |
 | :--- | :--- | :--- | :--- |
-| **Scenario 1: Dry Heat Spike** | 35.4°C, 47% RH, 0.0mm rain, 0.76m swell | *Guesses heavy monsoon downpours and high waves based on static regional priors.* | **Accurate Operational Advice**: Safe for 2–3 hr artisanal fishing; mandates hourly hydration breaks for outdoor workers due to heat index. |
-| **Scenario 2: Monsoon Squall** | 26.2°C, 94% RH, **54mm rain**, **42.5 km/h winds**, **2.85m waves**, 998 hPa | *Gives generic advice without knowing current wave height or squall status.* | **Hard Stand-Down**: *"Wind (23 kt) and wave height (2.85m) exceed safe limits for artisanal boats. Stay in port. Secure moorings. Prepare low-lying areas for flooding."* |
-| **Scenario 3: Winter Stagnation & Pollution Surge** | 31.0°C, calm sea (0.42m wave), **PM2.5 = 168.4 µg/m³ (Very Unhealthy)** | *Fails to detect air stagnation; advises general beach strolls.* | **Targeted Hazard Advisory**: Sea is safe to launch, but mandates N95 masks on deck; reschedules heavy outdoor labor to dawn/dusk to avoid peak pollution. |
+| Dry heat spike | 35.4°C, 47% RH, 0.0mm rain, 0.76m swell | Guesses monsoon downpours and high waves from static regional priors | Safe for 2–3hr artisanal fishing; mandates hourly hydration breaks given heat index |
+| Monsoon squall | 26.2°C, 94% RH, 54mm rain, 42.5 km/h wind, 2.85m waves, 998 hPa | Gives generic advice, unaware of current wave height or squall status | "Wind (23kt) and wave height (2.85m) exceed safe limits for artisanal boats. Stay in port. Secure moorings." |
+| Winter stagnation + pollution surge | 31.0°C, calm sea (0.42m wave), PM2.5 = 168.4 µg/m³ (very unhealthy) | Fails to detect air stagnation; advises a beach stroll | Sea is safe to launch, but mandates N95 masks on deck; reschedules outdoor labor to dawn/dusk |
 
 ---
 
-## ⚡ Quickstart
+## Quickstart
 
-### 1. Clone & Install
+### 1. Clone and install
+
 ```bash
 git clone https://github.com/csharikrishna/Confluence.git
 cd Confluence
 python -m venv venv
-# On Windows:
+
+# Windows
 .\venv\Scripts\activate
-# On Linux/macOS:
+# Linux / macOS
 source venv/bin/activate
 
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
-Copy the example environment file:
+### 2. Configure environment
+
 ```bash
 cp .env.example .env
 ```
-Edit `.env` to configure your keys:
-```env
-# OpenAQ API Key (Free tier key from https://openaq.org/)
-OPENAQ_API_KEY=your_openaq_api_key_here
 
-# NVIDIA NIM API Key (Optional, for frontier model grounding tests)
-NVIDIA_API_KEY=your_nvidia_api_key_here
+At minimum, set `OPENAQ_API_KEY` (free from [openaq.org](https://openaq.org)). Everything else in `.env.example` is optional — durable storage, alert webhooks, and Google Drive backup all stay inert until explicitly configured.
 
-# Server Port
-PORT=8000
-```
+### 3. Run the dev server
 
-### 3. Run the Development Server
 ```bash
 uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
-Open **[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)** for the interactive OpenAPI / Swagger UI documentation.
+
+Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for interactive Swagger docs.
 
 ---
 
-## 📡 API Reference
+## Project structure
+
+```
+Confluence/
+├── app.py                    # FastAPI app: routes, lifespan, middleware
+├── environmental_data.py     # Core data pipeline — fetches & normalizes all 7 sources
+├── derived_insights.py       # Physics-informed composite signals (heat index, sea state, ...)
+├── rules_engine.py           # Config-driven alert evaluation
+├── alert_rules.json          # Alert thresholds — tunable without a code change
+├── locations.py / .json      # Registered multi-location coastal registry
+├── notifications.py          # Optional Slack/Discord alert webhook
+├── gdrive_backup.py          # Optional daily Google Drive history backup
+├── utils.py                  # Shared helpers (dotted-path field resolution)
+│
+├── db_backend.py             # Storage backend selector (STORAGE_BACKEND env var)
+├── storage.py                # SQLite backend (default)
+├── mongo_storage.py          # MongoDB Atlas backend (recommended for durable history)
+├── couchdb_storage.py        # CouchDB backend (kept available, not recommended)
+│
+├── tests/                    # pytest suite — offline (mocked) + live-remote
+├── scripts/                  # Standalone demo/PoC tools, not part of the app or test suite
+│   ├── grounding_test.py             # Single-model grounded vs. ungrounded comparison
+│   ├── multi_model_grounding_demo.py # Multi-model, multi-condition grounding demo
+│   ├── stress_test.py                # 7-way failure-isolation + edge-case suite
+│   └── nvidia_grounding_client.py    # Minimal NVIDIA NIM API usage example
+│
+├── docs/                     # Design docs and phase write-ups
+├── render.yaml, Procfile     # Render deployment config
+├── docker-compose.*.yml      # Local CouchDB/MongoDB for backend development
+└── requirements*.txt         # Base + optional (mongo, gdrive) dependencies
+```
+
+---
+
+## API reference
 
 ### `GET /environment`
-Fetches the normalized, multi-domain environmental intelligence snapshot.
 
-#### Query Parameters:
-| Parameter | Type | Required | Description | Example |
-| :--- | :--- | :--- | :--- | :--- |
-| `lat` | `float` | **Yes** | Latitude between `-90.0` and `90.0` | `13.08` |
-| `lon` | `float` | **Yes** | Longitude between `-180.0` and `180.0` | `80.27` |
-| `name` | `string` | No | Optional human-readable location label | `Chennai Coast` |
-| `timeout` | `float` | No | Per-source request timeout in seconds (default: `10.0`) | `10.0` |
-| `bypass_cache` | `bool` | No | Force fresh upstream fetch bypassing the 5m cache | `false` |
+Fetches the normalized, multi-domain environmental snapshot for any coordinates.
 
-#### Sample Response:
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `lat` | `float` | Yes | Latitude, `-90.0` to `90.0` |
+| `lon` | `float` | Yes | Longitude, `-180.0` to `180.0` |
+| `name` | `string` | No | Optional human-readable label |
+| `timeout` | `float` | No | Per-source timeout in seconds (default `10.0`) |
+| `bypass_cache` | `bool` | No | Force a fresh fetch, skipping the 5-minute cache |
+
+<details>
+<summary>Sample response</summary>
+
 ```json
 {
-  "location": {
-    "name": "Chennai Coast",
-    "lat": 13.08,
-    "lon": 80.27
-  },
+  "location": { "name": "Chennai Coast", "lat": 13.08, "lon": 80.27 },
   "generated_at": "2026-09-03T11:30:29Z",
   "data": {
     "weather": {
@@ -141,7 +181,6 @@ Fetches the normalized, multi-domain environmental intelligence snapshot.
       "precipitation_mm": 0.1,
       "uv_index": 0.25,
       "visibility_m": 6620.0,
-      "weather_code": 51,
       "weather_description": "Light drizzle",
       "is_day": true,
       "source": "open-meteo",
@@ -152,214 +191,188 @@ Fetches the normalized, multi-domain environmental intelligence snapshot.
       "sea_surface_temp_c": 30.6,
       "wave_height_m": 0.78,
       "wave_period_s": 8.75,
-      "wind_wave_height_m": 0.24,
       "swell_wave_height_m": 0.60,
       "ocean_current_velocity_kmh": 1.1,
-      "ocean_current_direction_deg": 18,
-      "note": null,
       "source": "open-meteo-marine",
-      "observed_at": "2026-09-03T11:30:00Z",
       "status": "ok"
     },
     "air_quality": {
       "station_name": "Royapuram, Chennai - TNPCB",
       "pm25": 23.83,
       "pm10": 51.8,
-      "o3": 28.06,
-      "no2": 11.4,
-      "so2": 4.56,
-      "co": 1.26,
       "aqi_category": "moderate",
       "source": "openaq",
-      "observed_at": "2026-09-02T10:30:00Z",
       "status": "ok"
     },
-    "sun_and_lighting": {
-      "sunrise": "2026-09-03T00:26:46+00:00",
-      "sunset": "2026-09-03T12:49:55+00:00",
-      "solar_noon": "2026-09-03T06:38:21+00:00",
-      "day_length_hours": 12.39,
-      "nautical_twilight_begin": "2026-09-02T23:41:23+00:00",
-      "nautical_twilight_end": "2026-09-03T13:35:18+00:00",
-      "source": "sunrise-sunset.org",
-      "status": "ok"
-    },
-    "terrain": {
-      "elevation_m": 10.0,
-      "coastal_risk_category": "elevated",
-      "source": "open-meteo-elevation",
-      "status": "ok"
-    },
-    "climate_baseline": {
-      "solar_radiation_kwh_m2": 6.01,
-      "avg_temperature_c": 30.82,
-      "avg_wind_speed_ms": 3.74,
-      "source": "nasa-power",
-      "observed_at": "2026-08-28T00:00:00Z",
-      "status": "ok"
-    },
-    "seismic_risk": {
-      "recent_events_7d_count": 0,
-      "max_magnitude": null,
-      "hazard_level": "nominal",
-      "search_radius_km": 500,
-      "source": "usgs-earthquake",
-      "status": "ok"
-    }
+    "sun_and_lighting": { "sunrise": "2026-09-03T00:26:46+00:00", "sunset": "2026-09-03T12:49:55+00:00", "status": "ok" },
+    "terrain": { "elevation_m": 10.0, "coastal_risk_category": "elevated", "status": "ok" },
+    "climate_baseline": { "solar_radiation_kwh_m2": 6.01, "avg_temperature_c": 30.82, "status": "ok" },
+    "seismic_risk": { "recent_events_7d_count": 0, "hazard_level": "nominal", "status": "ok" }
   },
   "meta": {
     "confidence": "high — all sources responded successfully",
     "failed_sources": [],
     "total_latency_ms": 2652.44,
-    "cache_hit": false
+    "cache_hit": false,
+    "derived_insights": { "heat_index_c": 34.9, "small_craft_risk_level": "none", "...": "..." },
+    "trend_24h": null,
+    "active_alerts": []
   }
 }
 ```
 
----
-
-## 🧠 Phase 2 — History, Trends & Alerting
-
-Phase 1 answered "what's happening right now, at one point." Phase 2 adds memory (what's changing), a network (more than one point), and judgment (proactively flagging what's worth attention) — without adding ML, new external data sources, or infra beyond a SQLite file and the existing cron pattern.
-
-### Physics-informed derived insights
-
-Every `/environment` response now includes `meta.derived_insights` — composite signals computed from the raw hyperparameters using cited, published physical/meteorological standards, **not** a learned model. This does the "connect the hyperparameters" arithmetic once, server-side, instead of leaving an LLM to guess at it:
-
-| Field | What it combines | Standard cited |
-| :--- | :--- | :--- |
-| `heat_index_c` / `heat_index_category` | Temperature + humidity → physiological heat stress | NOAA/Rothfusz heat index regression |
-| `dew_point_c` / `fog_risk` | Temperature + humidity + wind → fog/mist likelihood | Magnus-Tetens approximation |
-| `beaufort_scale` | Wind speed → force 0-12 | WMO-adopted Beaufort scale |
-| `imd_cyclone_category` | Sustained wind speed → system classification | IMD (India Meteorological Department) official scale |
-| `small_craft_risk_level` | Wave height + wind speed + gusts → marine warning tier | NWS coastal marine warning wind/sea criteria |
-| `storm_potential_score` / `_level` | Pressure + gusts + cloud cover → composite storm precursor score | Engineering heuristic (see honest scope note below) |
-| `rapid_pressure_fall` | 24h pressure change, normalized by latitude | Bergeron / Sanders-Gyakum (1980) rapid-cyclogenesis criterion |
-| `air_stagnation_index` | Wind speed + precipitation + PM2.5 → pollutant-accumulation risk | Engineering heuristic |
-| `coastal_flood_risk` | Elevation + wave height + wind + inverse-barometer surge | Inverse barometer effect (~1cm sea-level rise per 1hPa deficit) |
-| `tsunami_advisory` | Seismic magnitude + depth + elevation → tsunami run-up caution | USGS shallow-focus (<70km) criterion |
-
-**Honest scope note:** the heat index, dew point, Beaufort scale, IMD classification, NWS marine warning criteria, inverse barometer effect, and rapid-pressure-fall formula are all real, cited, published standards — not something I invented. The two exceptions are `storm_potential_score` and `air_stagnation_index`, which remain engineering heuristics (reasonable, documented threshold combinations) rather than a single official published index — no such standardized single-number index exists for either in the literature I'm aware of. The rapid-pressure-fall criterion is itself borrowed from *extratropical* cyclogenesis and applied here only as a generic "something's dropping fast" signal at these tropical/subtropical latitudes, not as a literal claim of bombogenesis — see the docstring in `derived_insights.py` for the full caveat.
+*(`meta.derived_insights`, `meta.trend_24h`, and `meta.active_alerts` are Phase 2 additions — see below.)*
+</details>
 
 ### `GET /environment/history`
+
 Query persisted snapshot history for a location:
 
 ```
 GET /environment/history?lat=13.08&lon=80.27&start=2026-09-01T00:00:00Z&end=2026-09-03T00:00:00Z&field=weather.temperature_c
 ```
 
-Every fresh (non-cache-hit) `/environment` fetch is persisted to a local SQLite store (`snapshots` table) in the background, so history accumulates from both organic traffic and the hourly ingestion cron below. `meta.trend_24h` on `/environment` is a lightweight diff against the closest stored reading ~24h ago (`null` until enough history exists). Snapshots older than 90 days are pruned automatically at startup.
-
 ### `GET /locations`
-Lists every coastal point the service tracks for pre-warming, history ingestion, and `/alerts` — currently Chennai, Visakhapatnam, Kochi, Mumbai, and Kolkata/Sundarbans. `/environment` still accepts **any** `lat`/`lon`; this registry is what the scheduled jobs iterate over.
+
+Lists every coastal point the service tracks for pre-warming, history ingestion, and `/alerts`. `/environment` still accepts any `lat`/`lon` — this registry is only what the scheduled jobs iterate over.
 
 ### `GET /alerts`
-Evaluates a config-driven rules engine (`alert_rules.json`) — thresholds and trend conditions over both raw and derived fields — against every registered location (or a single `lat`/`lon`), and returns currently active alerts:
+
+Evaluates the rules engine against every registered location (or a single `lat`/`lon`) and returns currently active alerts — see [Phase 2](#phase-2--history-trends--alerting) below for details.
+
+### `GET /health`
+
+Service health, active storage backend, and connectivity status.
+
+---
+
+## Phase 2 — History, Trends & Alerting
+
+Phase 1 answers "what's happening right now, at one point." Phase 2 adds memory (what's changing), a network (more than one point), and judgment (proactively flagging what's worth attention) — without ML, new external data sources, or infrastructure beyond a database and a cron job.
+
+### Physics-informed derived insights
+
+Every `/environment` response includes `meta.derived_insights` — composite signals computed from the raw hyperparameters using cited, published physical standards, not a learned model:
+
+| Field | Combines | Standard |
+| :--- | :--- | :--- |
+| `heat_index_c` / `heat_index_category` | Temperature + humidity | NOAA/Rothfusz heat index regression, with published low/high-humidity corrections |
+| `dew_point_c` / `fog_risk` | Temperature + humidity + wind | Magnus-Tetens approximation |
+| `beaufort_scale` | Wind speed | WMO-adopted Beaufort scale (force 0–12) |
+| `imd_cyclone_category` | Sustained wind speed | India Meteorological Department official classification |
+| `small_craft_risk_level` | Wave height + wind + gusts | NWS coastal marine warning tiers (Small Craft Advisory → Hurricane Force) |
+| `storm_potential_score` / `_level` | Pressure + gusts + cloud cover + 3h pressure trend | Engineering heuristic (no single published index exists) |
+| `rapid_pressure_fall` | 24h pressure change, latitude-normalized | Bergeron / Sanders-Gyakum (1980) rapid-cyclogenesis criterion |
+| `air_stagnation_index` | Wind + precipitation + PM2.5 | Engineering heuristic |
+| `coastal_flood_risk` | Elevation + wave height + wind + inverse-barometer surge | Inverse barometer effect (~1cm sea-level rise per 1hPa deficit) |
+| `tsunami_advisory` | Seismic magnitude + depth + elevation | USGS shallow-focus (<70km) criterion |
+
+Everything above is a real, cited, published standard except `storm_potential_score` and `air_stagnation_index`, which are documented engineering heuristics — no single standardized index exists for either. The rapid-pressure-fall criterion is borrowed from *extratropical* cyclogenesis and applied here only as a generic "pressure is falling unusually fast" signal at these tropical/subtropical latitudes, not a literal bombogenesis claim. Full citations and scope notes: [`derived_insights.py`](derived_insights.py).
+
+### History, trends, and locations
+
+- **`GET /environment/history`** — persisted snapshot history for a location, optionally narrowed to one dotted field.
+- **`meta.trend_24h`** — a lightweight diff against the closest stored reading ~24h ago (`null` until enough history exists).
+- **`GET /locations`** — the multi-location registry (Chennai, Visakhapatnam, Kochi, Mumbai, Kolkata/Sundarbans by default).
+- Every fresh (non-cache-hit) `/environment` fetch is persisted in the background, and [`.github/workflows/ingest_history.yml`](.github/workflows/ingest_history.yml) hits every registered location hourly so history accumulates independent of organic traffic. Records older than 90 days are pruned automatically.
+
+### `GET /alerts`
+
+A config-driven rules engine ([`alert_rules.json`](alert_rules.json)) evaluates threshold and trend conditions over both raw and derived fields, against every registered location or a single `lat`/`lon`:
 
 ```json
 {
   "generated_at": "2026-09-03T12:00:05Z",
   "locations_checked": 5,
-  "active_alert_count": 2,
+  "active_alert_count": 1,
   "active_alerts": [
     {
       "id": "small_craft_unsafe",
       "severity": "high",
-      "message": "Sea state 'unsafe' for small craft (wave 1.38m, wind 17.1km/h). Do not launch small or artisanal vessels.",
+      "message": "Marine warning 'small_craft_advisory' in effect (wave 1.38m, wind 17.1km/h). Do not launch small or artisanal vessels.",
       "location": { "name": "Mumbai Coast", "lat": 18.94, "lon": 72.84 }
     }
   ]
 }
 ```
 
-Rules cover unhealthy PM2.5, unsafe sea state, storm-level wind/gusts, heavy-rain flood risk, dangerous heat index, composite coastal-flood/storm-potential scores, seismic tsunami caution, air stagnation, and two trend-based rules (rapid temperature spike, PM2.5 doubling over 3h) that need stored history to evaluate. Thresholds live entirely in `alert_rules.json` — tunable without a code change. Triggered alerts are logged to a `alerts_log` table (deduped per rule/location on a 60-minute cooldown) for future "this alert fired N times this month" reporting.
+Rules cover unhealthy PM2.5, unsafe sea state, strong sustained wind (Beaufort 6+) and gale-force gusts, heavy-rain flood risk, dangerous heat index, composite coastal-flood/storm-potential scores, IMD cyclonic-storm classification, seismic tsunami caution, air stagnation, and trend-based rules (rapid temperature spike, PM2.5 doubling, rapid pressure fall). Thresholds live entirely in `alert_rules.json` — tunable without a code change. Triggered alerts are deduped per rule/location on a 60-minute cooldown and logged for future reporting.
 
-**Optional alert delivery:** set `ALERT_WEBHOOK_URL` to a Slack or Discord incoming-webhook URL and every newly-triggered (non-duplicate) alert is also pushed there — the Phase 2C "stretch goal" from the design doc. Fully inert if left unset.
+**Optional alert delivery**: set `ALERT_WEBHOOK_URL` to a Slack or Discord incoming-webhook URL and every newly-triggered alert is also pushed there. Fully inert if left unset.
 
-### Scheduled ingestion
-`.github/workflows/ingest_history.yml` runs hourly, reads the live `/locations` registry, and calls `/environment?bypass_cache=true` for each point — causing the deployed app to persist a fresh snapshot per location every hour, independent of organic traffic.
+### Storage backends
 
-> **Note on Render's free tier:** its filesystem is ephemeral — a redeploy or restart wipes `confluence_history.db`. History still accumulates correctly between restarts (it's a real file, not in-memory), it just isn't durable across deploys until a persistent disk is attached. Set `CONFLUENCE_DB_PATH` to relocate the DB file if you do add one.
+The history store is backend-agnostic — `storage.py` (SQLite, default), `mongo_storage.py` (**recommended** for durable history: MongoDB Atlas's free tier, fully managed, no credit card), and `couchdb_storage.py` (available but not recommended — needs a self-hosted server) all expose identical function signatures, selected via `STORAGE_BACKEND=sqlite|mongo|couchdb`. All three are verified against real running instances, not just mocks. Full setup and the reasoning behind the Mongo recommendation: [`docs/PHASE2_WALKTHROUGH.md`](docs/PHASE2_WALKTHROUGH.md).
 
-### Pluggable storage backend + optional Google Drive backup
-
-The history store is backend-agnostic: `storage.py` (SQLite, default), `mongo_storage.py` (**recommended** for durable history — MongoDB Atlas's free M0 tier, fully managed, no credit card), and `couchdb_storage.py` (kept available but not recommended — needs a self-hosted server) all expose identical function signatures, selected via `STORAGE_BACKEND=sqlite|mongo|couchdb` — see `db_backend.py`. Mongo needs only `MONGODB_URI` (plus `pip install -r requirements-mongo.txt`); CouchDB needs a separately-run server and `COUCHDB_URL`/`COUCHDB_USER`/`COUCHDB_PASSWORD`. Separately, `gdrive_backup.py` can push a daily JSON export of recent history to a Google Drive folder as a disaster-recovery copy (`GDRIVE_ENABLED` + a service account — see `requirements-gdrive.txt`) — this is a backup, not a live queryable store. All three storage backends have been verified against real running instances, not just mocks. Full setup instructions and honest caveats, including why CouchDB was dropped in favor of Mongo: [docs/PHASE2_WALKTHROUGH.md](docs/PHASE2_WALKTHROUGH.md) Part 4.
+Separately, `gdrive_backup.py` can push a daily JSON export of recent history to Google Drive as a disaster-recovery copy — a backup, not a live queryable store.
 
 ### Explicitly out of scope (Phase 2)
-No ML/forecasting, no new data sources beyond the existing 7, no user accounts or per-user alert subscriptions, no UI, no message-queue infra — see [docs/phase2-plan.md](docs/phase2-plan.md) §7 for the full rationale.
+
+No ML/forecasting, no new data sources beyond the existing 7, no user accounts or per-user subscriptions, no UI, no message-queue infrastructure. See [`docs/phase2-plan.md`](docs/phase2-plan.md) §7 for the rationale.
 
 ---
 
-## 🧪 Automated Testing
+## Testing
 
-Confluence includes dedicated test suites covering offline mock unit tests, live remote verification, and failure isolation, across both Phase 1 and Phase 2:
+### Offline unit & mocked integration suite (181 tests)
 
-### 1. Offline Unit & Mocked Integration Suite (181 Tests)
-Validates boundary sanity checks, canonical ISO UTC normalization, coordinate validation, isolated failure degradation, the physics-informed derived insights, the rules engine (including the Phase 1 Day 2 monsoon-squall fixture and a false-positive check on calm data), all three history-store backends (SQLite, MongoDB, CouchDB), the locations registry, the alert webhook, and every endpoint — all without external network calls. This suite runs automatically on every push/PR via [`.github/workflows/tests.yml`](.github/workflows/tests.yml):
+Boundary sanity checks, ISO-UTC normalization, coordinate validation, isolated failure degradation, the physics-informed derived insights, the rules engine (including a real monsoon-squall scenario and an explicit false-positive check on calm data), all three storage backends, the locations registry, and every endpoint — no network calls. Runs automatically on every push via [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
+
 ```bash
 pytest tests/ --ignore=tests/test_live_remote.py -v
 ```
-```text
-======================== 181 passed in ~6s ========================
-```
 
-### 2. Live Remote Deployment Suite (4 Tests)
-Targets the live deployed service to verify real-world connectivity, CORS headers, cache hits, and 400 bad-request handling *(automatically skipped when running offline)*:
+### Live remote deployment suite (4 tests)
+
+Verifies the deployed service directly — connectivity, CORS, cache hits, 400 handling. Automatically skipped when the target is unreachable.
+
 ```bash
-# On Windows (PowerShell):
-$env:API_BASE_URL="https://confluence-si41.onrender.com"; pytest tests/test_live_remote.py -v
-
-# On Linux / macOS:
 API_BASE_URL="https://confluence-si41.onrender.com" pytest tests/test_live_remote.py -v
 ```
-```text
-============================== 4 passed in 3.92s ==============================
-```
 
-### 3. 7-Way Failure-Isolation Stress Suite
-Executes 7 independent failure-isolation runs, killing each upstream source individually to verify graceful degradation:
+### 7-way failure-isolation stress suite
+
+Kills each upstream source independently to verify the other six still return cleanly.
+
 ```bash
-python test_stress_and_edge_cases.py
-```
-```text
-OVERALL STRESS-TEST RESULT: ALL PASS [100%]
+python scripts/stress_test.py
 ```
 
 ---
 
-## ☁️ 1-Click Deployment (Render / Railway)
+## Deployment
 
-This repository includes a pre-configured [render.yaml](render.yaml) and [Procfile](Procfile):
+This repository includes a pre-configured [`render.yaml`](render.yaml) and [`Procfile`](Procfile).
 
 1. Fork or push this repository to GitHub.
-2. In **[Render](https://dashboard.render.com/)**, click **New +** $\rightarrow$ **Blueprint** and select this repo.
-3. Set `OPENAQ_API_KEY` (and optional `NVIDIA_API_KEY`) in Render's environment settings.
+2. In [Render](https://dashboard.render.com/), click **New** → **Blueprint** and select this repo.
+3. Set `OPENAQ_API_KEY` (and optionally `NVIDIA_API_KEY`) in Render's environment settings.
 4. Add your deployed URL to GitHub Secrets as `RENDER_APP_URL` to enable the keep-alive and hourly ingestion cron workflows.
-5. Optional: set `ALERT_WEBHOOK_URL` (Slack/Discord) to receive pushed alerts. Optional: attach a Render persistent disk and set `CONFLUENCE_DB_PATH` to make history/trends survive redeploys (see `render.yaml` comments — requires a paid plan, so it's off by default).
+5. Optional: set `ALERT_WEBHOOK_URL` for pushed alerts, or `STORAGE_BACKEND=mongo` + `MONGODB_URI` for durable history (see `render.yaml` comments).
 
 ---
 
-## ⚠️ Limitations & Production Readiness
+## Limitations & production readiness
 
-Documenting this honestly rather than overselling it:
+Documented honestly rather than oversold:
 
-- **History isn't durable on the free tier.** Render's free-tier filesystem is ephemeral — `confluence_history.db` is wiped on every redeploy. Trend/alert logic is correct and works between restarts, it just isn't durable across deploys until a persistent disk is attached (see `render.yaml`).
-- **No authentication.** `/environment`, `/alerts`, and `/environment/history` are public, rate-limited (30-60/min) but unauthenticated, by explicit Phase 2 design (see [docs/phase2-plan.md](docs/phase2-plan.md) §7). Fine for a public grounding API; not a fit if per-consumer quotas or private data ever enter scope.
-- **Single free-tier instance.** No load balancing, no uptime monitoring/paging, no SLA. A CI test gate now runs on every push ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)), but nothing currently watches the live deployment's uptime — that needs an external monitor (e.g. UptimeRobot/Better Uptime) pointed at `/health`.
-- **Most derived signals now cite official published standards** (NOAA heat index, Magnus-Tetens dew point, WMO Beaufort scale, IMD cyclone classification, NWS marine warning criteria, the inverse barometer effect, USGS shallow-focus tsunami criterion) rather than ad-hoc bands — see the table above. `storm_potential_score` and `air_stagnation_index` remain engineering heuristics since no single standardized published index exists for either. None of this has been reviewed by an actual meteorologist/oceanographer — the formulas are correctly cited, but nobody with domain authority has signed off on how they're combined or applied here. Treat outputs as a strong, sourced first pass, not a certified safety authority.
-- **Not wired into any AI platform.** Nothing here makes a frontier model call this API automatically — it has to be registered as a tool/function by whoever builds the agent that uses it. This is grounding infrastructure a developer plugs in, not a live integration today.
-
----
-
-## 📚 Documentation & Project History
-
-- **Phase 2 Walkthrough (History, Trends, Alerting, Hardening)**: [docs/PHASE2_WALKTHROUGH.md](docs/PHASE2_WALKTHROUGH.md)
-- **Phase 2 Design Doc**: [docs/phase2-plan.md](docs/phase2-plan.md)
-- **Historical Phase 1 Pilot Specification**: [docs/phase1-planning-archive.md](docs/phase1-planning-archive.md)
-- **Frontier LLM Grounding PoC**: [test_multi_model_and_conditions.py](test_multi_model_and_conditions.py)
+- **No authentication.** `/environment`, `/alerts`, and `/environment/history` are public and rate-limited but unauthenticated — a deliberate Phase 2 design choice (see [`docs/phase2-plan.md`](docs/phase2-plan.md) §7), fine for a public grounding API, not a fit if per-consumer quotas ever enter scope.
+- **Single instance, no SLA.** A CI test gate runs on every push, but nothing pages anyone if the live deployment goes down beyond the existing keep-alive cron's own pass/fail signal — a dedicated monitor (UptimeRobot, Better Uptime) would need to be added separately.
+- **Derived signals are correctly cited, not independently certified.** Most formulas are real published standards (see the table above), but nobody with domain authority (a meteorologist or oceanographer) has reviewed how they're combined here. Treat outputs as a strong, sourced first pass — not a certified safety authority — until reviewed by one.
+- **Not wired into any AI platform.** Nothing here makes a frontier model call this API automatically; it has to be registered as a tool/function by whoever builds the agent that uses it. This is grounding infrastructure a developer plugs in, not a live integration today.
+- **History durability depends on the storage backend.** SQLite on Render's free tier is wiped on redeploy (durable *between* restarts, not *across* deploys); MongoDB Atlas or an attached persistent disk fix this — see [`docs/PHASE2_WALKTHROUGH.md`](docs/PHASE2_WALKTHROUGH.md).
 
 ---
 
-## 📄 License
+## Documentation
 
-MIT License. See [LICENSE](LICENSE) for details.
+- [`docs/PHASE2_WALKTHROUGH.md`](docs/PHASE2_WALKTHROUGH.md) — history, trends, alerting, storage backends, and the hardening pass
+- [`docs/phase2-plan.md`](docs/phase2-plan.md) — the Phase 2 design doc this was built from
+- [`docs/phase1-planning-archive.md`](docs/phase1-planning-archive.md) — historical Phase 1 pilot specification
+- [`scripts/multi_model_grounding_demo.py`](scripts/multi_model_grounding_demo.py) — frontier LLM grounding demonstration
+
+---
+
+## License
+
+MIT License — see [`LICENSE`](LICENSE).

@@ -21,7 +21,6 @@ Every document additionally gets a Mango index on (lat, lon, timestamp) /
 """
 
 import os
-import json
 import uuid
 import logging
 from datetime import datetime, timezone, timedelta
@@ -83,6 +82,10 @@ def init_db():
     _ensure_index(ALERTS_DB, ["lat", "lon", "rule_id", "triggered_at"], "alerts_by_location_rule_time")
     try:
         prune_old_snapshots()
+    except Exception:
+        pass
+    try:
+        prune_old_alerts()
     except Exception:
         pass
 
@@ -154,8 +157,12 @@ def get_reading_hours_ago(lat, lon, hours_ago, tolerance_hours=1.5):
     return (closest.get("snapshot") or {}).get("data")
 
 
-def compute_trend_24h(lat, lon, current_data):
-    past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=3)
+def compute_trend_24h(lat, lon, current_data, past=None):
+    """`past` lets a caller reuse an already-fetched 24h-ago reading instead of
+    triggering a second identical CouchDB round-trip in the same request.
+    """
+    if past is None:
+        past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=3)
     if not past:
         return None
 
@@ -179,10 +186,11 @@ def compute_trend_24h(lat, lon, current_data):
     return trend or None
 
 
-def get_pressure_change_24h(lat, lon, current_pressure_hpa, tolerance_hours=3):
+def get_pressure_change_24h(lat, lon, current_pressure_hpa, tolerance_hours=3, past=None):
     if current_pressure_hpa is None:
         return None
-    past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=tolerance_hours)
+    if past is None:
+        past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=tolerance_hours)
     past_pressure = get_path(past, "weather.pressure_hpa") if past else None
     if past_pressure is None:
         return None
@@ -254,6 +262,21 @@ def prune_old_snapshots(retention_days=DEFAULT_RETENTION_DAYS):
 
     deletions = [{"_id": d["_id"], "_rev": d["_rev"], "_deleted": True} for d in docs]
     r = requests.post(_db_url(SNAPSHOTS_DB, "/_bulk_docs"), auth=_auth(), json={"docs": deletions}, timeout=REQUEST_TIMEOUT)
+    r.raise_for_status()
+    return len(deletions)
+
+
+def prune_old_alerts(retention_days=DEFAULT_RETENTION_DAYS):
+    """alerts_log has no equivalent of prune_old_snapshots without this — the
+    log would otherwise grow unbounded forever.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    docs = _find(ALERTS_DB, {"triggered_at": {"$lt": cutoff}}, limit=1000)
+    if not docs:
+        return 0
+
+    deletions = [{"_id": d["_id"], "_rev": d["_rev"], "_deleted": True} for d in docs]
+    r = requests.post(_db_url(ALERTS_DB, "/_bulk_docs"), auth=_auth(), json={"docs": deletions}, timeout=REQUEST_TIMEOUT)
     r.raise_for_status()
     return len(deletions)
 

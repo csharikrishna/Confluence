@@ -1,3 +1,5 @@
+"""Minimal standalone example: calling the NVIDIA NIM chat completions API directly."""
+
 import os
 import requests
 from dotenv import load_dotenv

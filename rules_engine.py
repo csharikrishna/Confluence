@@ -28,7 +28,7 @@ _OPERATORS = {
     "gte": lambda v, t: v is not None and v >= t,
     "lt": lambda v, t: v is not None and v < t,
     "lte": lambda v, t: v is not None and v <= t,
-    "eq": lambda v, t: v == t,
+    "eq": lambda v, t: v is not None and v == t,
     "in": lambda v, t: v is not None and v in t,
 }
 

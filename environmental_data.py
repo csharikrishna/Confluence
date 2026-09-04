@@ -1,15 +1,10 @@
 """
-Unified Environmental Intelligence — Phase 1 Test Script
-Target location: Chennai Coast (13.08 N, 80.27 E)
+Core environmental data pipeline — concurrently fetches and normalizes readings
+from 7 independent free APIs (weather, marine, air quality, astronomical,
+terrain, climate baseline, seismic) into one unified JSON snapshot. This is the
+data layer app.py's /environment endpoint is built on, not a test file.
 
-Fetches from 4 free sources and normalizes into one unified JSON response.
 Each source is fetched independently — if one fails, the others still return.
-
-Sources:
-1. Open-Meteo Weather   (no key)
-2. Open-Meteo Marine    (no key)
-3. OpenAQ Air Quality   (free key required — paste yours below)
-4. NASA POWER           (no key)
 """
 
 import os
@@ -776,9 +771,18 @@ def get_environmental_snapshot(lat, lon, name="Unnamed Location", timeout=TIMEOU
     if data_warnings:
         meta["data_quality_warnings"] = data_warnings
 
-    # Add freshness warning if climate baseline data has inherent lag (>24h)
+    # Add freshness warning if climate baseline data is actually >24h old.
+    # NASA POWER's satellite/model processing pipeline has an inherent multi-day
+    # lag, so this fires most of the time in practice — but it's computed from
+    # the real observed_at timestamp, not asserted unconditionally.
     if climate_baseline.get("status") == "ok" and climate_baseline.get("observed_at"):
-        meta["freshness_warning"] = "climate_baseline data is >24h old"
+        try:
+            observed_dt = datetime.strptime(climate_baseline["observed_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            age_hours = (datetime.now(timezone.utc) - observed_dt).total_seconds() / 3600.0
+            if age_hours > 24:
+                meta["freshness_warning"] = f"climate_baseline data is {age_hours:.1f}h old (>24h)"
+        except (ValueError, TypeError):
+            pass
 
     snapshot = {
         "location": {"name": name, "lat": lat, "lon": lon},

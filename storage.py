@@ -82,6 +82,10 @@ def init_db():
         prune_old_snapshots()
     except Exception:
         pass
+    try:
+        prune_old_alerts()
+    except Exception:
+        pass
 
 
 def save_snapshot(lat, lon, name, snapshot):
@@ -163,13 +167,19 @@ def get_reading_hours_ago(lat, lon, hours_ago, tolerance_hours=1.5):
         return None
 
 
-def compute_trend_24h(lat, lon, current_data):
+def compute_trend_24h(lat, lon, current_data, past=None):
     """Diff a curated set of fields against the closest stored reading ~24h ago.
 
     Returns None if there's no reading old enough yet (e.g. a brand-new location) —
     trend data necessarily needs history to exist first.
+
+    `past` lets a caller that already fetched the 24h-ago reading (e.g. for
+    get_pressure_change_24h in the same request) pass it in directly instead of
+    triggering a second identical lookup — matters most for the remote
+    Mongo/CouchDB backends, where each lookup is a network round-trip.
     """
-    past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=3)
+    if past is None:
+        past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=3)
     if not past:
         return None
 
@@ -188,14 +198,18 @@ def compute_trend_24h(lat, lon, current_data):
     return trend or None
 
 
-def get_pressure_change_24h(lat, lon, current_pressure_hpa, tolerance_hours=3):
+def get_pressure_change_24h(lat, lon, current_pressure_hpa, tolerance_hours=3, past=None):
     """Raw numeric pressure delta (current - reading ~24h ago), or None if no
     history exists yet or the current pressure isn't available. Powers the
     latitude-normalized rapid-pressure-fall signal in derived_insights.py.
+
+    `past` lets a caller reuse an already-fetched 24h-ago reading — see
+    compute_trend_24h's docstring for why this matters.
     """
     if current_pressure_hpa is None:
         return None
-    past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=tolerance_hours)
+    if past is None:
+        past = get_reading_hours_ago(lat, lon, 24, tolerance_hours=tolerance_hours)
     past_pressure = get_path(past, "weather.pressure_hpa") if past else None
     if past_pressure is None:
         return None
@@ -289,6 +303,21 @@ def prune_old_snapshots(retention_days=DEFAULT_RETENTION_DAYS):
     conn = _connect()
     try:
         cur = conn.execute("DELETE FROM snapshots WHERE timestamp < ?", (cutoff,))
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
+def prune_old_alerts(retention_days=DEFAULT_RETENTION_DAYS):
+    """Delete alert_log entries older than `retention_days`. Without this,
+    alerts_log has no equivalent of prune_old_snapshots and grows unbounded
+    forever. Returns rows deleted.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn = _connect()
+    try:
+        cur = conn.execute("DELETE FROM alerts_log WHERE triggered_at < ?", (cutoff,))
         conn.commit()
         return cur.rowcount
     finally:

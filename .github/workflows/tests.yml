@@ -19,7 +19,12 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        # requirements-mongo.txt is small and installed unconditionally here (same
+        # reasoning as render.yaml) so test_mongo_storage.py exercises the real
+        # pymongo driver rather than a degraded fallback. requirements-gdrive.txt
+        # stays opt-in — gdrive_backup.py imports its libraries lazily inside
+        # functions, so its tests correctly skip without it, no NameError risk.
+        run: pip install -r requirements.txt -r requirements-mongo.txt
 
       - name: Run offline test suite
         run: pytest tests/ --ignore=tests/test_live_remote.py -v

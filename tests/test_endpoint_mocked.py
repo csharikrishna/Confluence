@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 # Ensure project root is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from env_intelligence_test import (
+from environmental_data import (
     get_environmental_snapshot,
     fetch_weather,
     fetch_marine,
@@ -257,10 +257,10 @@ class TestEnvironmentalIntelligence(unittest.TestCase):
     # Integration test with mocked partial failure
     # -----------------------------------------------------------------------
 
-    @patch("env_intelligence_test.fetch_weather")
-    @patch("env_intelligence_test.fetch_marine")
-    @patch("env_intelligence_test.fetch_air_quality")
-    @patch("env_intelligence_test.fetch_climate_baseline")
+    @patch("environmental_data.fetch_weather")
+    @patch("environmental_data.fetch_marine")
+    @patch("environmental_data.fetch_air_quality")
+    @patch("environmental_data.fetch_climate_baseline")
     def test_get_environmental_snapshot_partial_failure(self, mock_climate, mock_aq, mock_marine, mock_weather):
         mock_weather.return_value = {"source": "open-meteo", "status": "ok", "temperature_c": 30.0, "latency_ms": 100}
         mock_marine.return_value = {"source": "open-meteo-marine", "status": "ok", "wave_height_m": 1.0, "latency_ms": 120}
@@ -308,10 +308,10 @@ class TestEnvironmentalIntelligence(unittest.TestCase):
         self.assertEqual(result["source"], "openaq")
         self.assertIn("Expecting value", result["error"])
 
-    @patch("env_intelligence_test.fetch_weather")
-    @patch("env_intelligence_test.fetch_marine")
-    @patch("env_intelligence_test.fetch_air_quality")
-    @patch("env_intelligence_test.fetch_climate_baseline")
+    @patch("environmental_data.fetch_weather")
+    @patch("environmental_data.fetch_marine")
+    @patch("environmental_data.fetch_air_quality")
+    @patch("environmental_data.fetch_climate_baseline")
     def test_snapshot_malformed_upstream_does_not_crash_pipeline(self, mock_climate, mock_aq, mock_marine, mock_weather):
         # Simulate weather, marine, climate ok; OpenAQ returns corrupted error
         mock_weather.return_value = {"source": "open-meteo", "status": "ok", "temperature_c": 31.0, "latency_ms": 100}

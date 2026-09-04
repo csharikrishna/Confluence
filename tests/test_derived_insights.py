@@ -43,6 +43,23 @@ class TestHeatIndex(unittest.TestCase):
         self.assertGreater(hi, 35.0)  # heat index must exceed ambient temp at this humidity
         self.assertLess(hi, 60.0)
 
+    def test_low_humidity_correction_lowers_result(self):
+        # NOAA's published correction: RH<13% in the 80-112F range subtracts from
+        # the base regression, which alone overstates heat index at low humidity.
+        # 37.8C/10% RH: base regression gives 34.9C, corrected gives 34.5C.
+        self.assertEqual(heat_index_c(37.8, 10.0), 34.5)
+
+    def test_high_humidity_correction_raises_result(self):
+        # NOAA's published correction: RH>85% in the 80-87F range adds to the base
+        # regression, which alone understates heat index at high humidity.
+        # 29.4C/90% RH: base regression gives 38.5C, corrected gives 38.6C.
+        self.assertEqual(heat_index_c(29.4, 90.0), 38.6)
+
+    def test_mid_range_humidity_unaffected_by_corrections(self):
+        # Neither correction applies at moderate humidity (13-85%) — confirms the
+        # corrections are properly scoped, not applied unconditionally.
+        self.assertEqual(heat_index_c(35.0, 70.0), 50.3)
+
     def test_missing_inputs_return_none(self):
         self.assertIsNone(heat_index_c(None, 80.0))
         self.assertIsNone(heat_index_c(35.0, None))
@@ -125,6 +142,23 @@ class TestStormPotential(unittest.TestCase):
         score = storm_potential_score(pressure_hpa=1015.0, wind_gusts_kmh=10.0, cloud_cover_pct=20.0)
         self.assertEqual(score, 0.0)
         self.assertEqual(storm_potential_level(score), "low")
+
+    def test_falling_3h_pressure_raises_score(self):
+        # This is the "single strongest storm precursor" per the function's own
+        # docstring — confirm it actually changes the outcome, not just accepted
+        # and silently ignored.
+        base = storm_potential_score(pressure_hpa=1010.0, wind_gusts_kmh=10.0, cloud_cover_pct=20.0)
+        with_fall = storm_potential_score(pressure_hpa=1010.0, wind_gusts_kmh=10.0, cloud_cover_pct=20.0, pressure_change_3h_hpa=-4.0)
+        self.assertGreater(with_fall, base)
+
+    def test_compute_derived_insights_wires_3h_pressure_change_into_storm_score(self):
+        # Regression: storm_potential_score's pressure_change_3h_hpa parameter
+        # previously had no caller anywhere in the codebase — always defaulted to
+        # None despite being described as the strongest precursor signal.
+        data = {"weather": {"status": "ok", "pressure_hpa": 1010.0, "wind_gusts_kmh": 10.0, "cloud_cover_pct": 20.0}}
+        without_fall = compute_derived_insights(data)
+        with_fall = compute_derived_insights(data, pressure_change_3h_hpa=-4.0)
+        self.assertGreater(with_fall["storm_potential_score"], without_fall["storm_potential_score"])
 
 
 class TestAirStagnation(unittest.TestCase):

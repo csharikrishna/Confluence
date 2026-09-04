@@ -50,7 +50,9 @@ _IMD_BANDS = [
 
 
 def heat_index_c(temp_c, humidity_pct):
-    """NOAA/Rothfusz regression heat index (apparent temperature from heat + humidity).
+    """NOAA/Rothfusz regression heat index (apparent temperature from heat + humidity),
+    including NOAA's two published edge-case corrections (low-humidity subtraction,
+    high-humidity addition) that the base regression alone under/overstates.
 
     Only meaningful once it's already hot — below 26.7C (80F) the regression is
     inaccurate and heat stress isn't the binding constraint, so we just return the
@@ -74,6 +76,12 @@ def heat_index_c(temp_c, humidity_pct):
         + 0.00085282 * t * r * r
         - 0.00000199 * t * t * r * r
     )
+    # NOAA's published adjustments for the regression's known weak spots.
+    if r < 13 and 80 <= t <= 112:
+        hi_f -= ((13 - r) / 4.0) * math.sqrt((17 - abs(t - 95.0)) / 17.0)
+    elif r > 85 and 80 <= t <= 87:
+        hi_f += ((r - 85) / 10.0) * ((87 - t) / 5.0)
+
     return round((hi_f - 32.0) * 5.0 / 9.0, 1)
 
 
@@ -194,8 +202,7 @@ def rapid_pressure_fall(pressure_change_24h_hpa, lat):
         return None
     lat_rad = math.radians(min(abs(lat), 89.9))
     sin_60 = math.sin(math.radians(60))
-    threshold = 24.0 * (math.sin(lat_rad) / sin_60) if lat_rad > 0 else 0.0
-    threshold = max(threshold, 3.0)  # a floor so equatorial locations aren't flagged on noise
+    threshold = max(24.0 * (math.sin(lat_rad) / sin_60), 3.0)  # floor so equatorial locations aren't flagged on noise
     is_rapid = pressure_change_24h_hpa <= -threshold
     return {
         "change_24h_hpa": round(pressure_change_24h_hpa, 2),
@@ -321,7 +328,7 @@ def tsunami_caution(max_magnitude, elevation_m, depth_km=None):
     return {"advisory": False, "reason": None}
 
 
-def compute_derived_insights(data, lat=None, pressure_change_24h_hpa=None):
+def compute_derived_insights(data, lat=None, pressure_change_24h_hpa=None, pressure_change_3h_hpa=None):
     """Assemble every composite signal from one snapshot's `data` dict.
 
     Each upstream domain may be missing or in an "error" status — every lookup below
@@ -329,8 +336,9 @@ def compute_derived_insights(data, lat=None, pressure_change_24h_hpa=None):
 
     `lat` and `pressure_change_24h_hpa` are optional — when given (app.py supplies
     them once Phase 2A history exists for the location), they enable the
-    latitude-normalized rapid-pressure-fall signal; omitted, everything else still
-    computes normally.
+    latitude-normalized rapid-pressure-fall signal. `pressure_change_3h_hpa` feeds
+    storm_potential_score's short-term trend term the same way. All optional;
+    omitted, everything else still computes normally.
     """
     data = data or {}
     weather = data.get("weather") or {}
@@ -350,7 +358,7 @@ def compute_derived_insights(data, lat=None, pressure_change_24h_hpa=None):
     hi = heat_index_c(temp, humidity)
     fog = fog_risk(temp, humidity, wind)
     craft = small_craft_risk(marine.get("wave_height_m"), wind, gusts)
-    storm_score = storm_potential_score(pressure, gusts, cloud)
+    storm_score = storm_potential_score(pressure, gusts, cloud, pressure_change_3h_hpa)
     stagnation = air_stagnation_index(wind, aq.get("pm25"), precip)
     flood = coastal_flood_risk(terrain.get("elevation_m"), marine.get("wave_height_m"), wind, pressure)
     tsunami = tsunami_caution(seismic.get("max_magnitude"), terrain.get("elevation_m"), seismic.get("max_magnitude_depth_km"))

@@ -213,6 +213,21 @@ class TestPruneOldSnapshots(MongoTestCase):
         self.assertEqual(deleted, 3)
 
 
+class TestPruneOldAlerts(MongoTestCase):
+    """alerts_log needs the same retention pruning as snapshots — without it,
+    the alerts collection grows unbounded forever.
+    """
+
+    def test_prune_returns_deleted_count(self):
+        result = MagicMock()
+        result.deleted_count = 2
+        self.alerts.delete_many.return_value = result
+
+        deleted = mongo.prune_old_alerts(retention_days=90)
+        self.assertEqual(deleted, 2)
+        self.alerts.delete_many.assert_called_once()
+
+
 class TestIsHealthy(unittest.TestCase):
     @patch("mongo_storage._get_client")
     def test_healthy_on_successful_ping(self, mock_get_client):

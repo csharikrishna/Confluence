@@ -31,13 +31,14 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from env_intelligence_test import get_environmental_snapshot, validate_coordinates
+from environmental_data import get_environmental_snapshot, validate_coordinates
 import db_backend as storage
 import notifications
 import gdrive_backup
 from locations import get_all_locations
 from derived_insights import compute_derived_insights
 from rules_engine import evaluate_alerts
+from utils import get_path
 
 # Reconfigure console encoding for Windows UTF-8 support
 if sys.stdout.encoding != "utf-8":
@@ -314,21 +315,51 @@ def get_environment(
     meta = snapshot.setdefault("meta", {})
 
     # Phase 2: physics-informed composite signals, computed fresh on every read.
-    # The rapid-pressure-fall signal needs a 24h-ago reading — best-effort, None
-    # until history exists for this location.
-    current_pressure = (data.get("weather") or {}).get("pressure_hpa")
+    # trend_24h and the rapid-pressure-fall signal both need the same "reading
+    # ~24h ago" lookup — fetch it once and hand it to both, rather than each
+    # triggering its own identical DB round-trip (doubles latency against the
+    # remote Mongo/CouchDB backends otherwise). None until history exists.
     try:
-        pressure_change_24h = storage.get_pressure_change_24h(lat, lon, current_pressure)
+        past_24h = storage.get_reading_hours_ago(lat, lon, 24, tolerance_hours=3)
     except Exception as e:
-        logger.warning(f"Pressure trend lookup failed for ({lat}, {lon}): {e}")
+        logger.warning(f"24h-ago history lookup failed for ({lat}, {lon}): {e}")
+        past_24h = None
+
+    current_pressure = (data.get("weather") or {}).get("pressure_hpa")
+    # NOTE: passing past=past_24h avoids a redundant identical fetch only when
+    # past_24h is already populated. If the fetch above failed/returned None,
+    # these still fall back to fetching internally per their own signatures —
+    # so they're wrapped too, or a transient DB failure (e.g. a brand-new
+    # SQLite file with no tables yet) would surface as an unhandled 500
+    # instead of gracefully degrading to "no trend data available."
+    try:
+        pressure_change_24h = storage.get_pressure_change_24h(lat, lon, current_pressure, past=past_24h)
+    except Exception as e:
+        logger.warning(f"24h pressure change computation failed for ({lat}, {lon}): {e}")
         pressure_change_24h = None
 
-    derived = compute_derived_insights(data, lat=lat, pressure_change_24h_hpa=pressure_change_24h)
+    # storm_potential_score's short-term pressure trend — a separate window (3h)
+    # from the 24h lookup above, so it's its own DB round-trip.
+    try:
+        past_3h = storage.get_reading_hours_ago(lat, lon, 3)  # default 1.5h tolerance, matching the trend-rule lookups
+    except Exception as e:
+        logger.warning(f"3h-ago history lookup failed for ({lat}, {lon}): {e}")
+        past_3h = None
+    pressure_3h_ago = get_path(past_3h, "weather.pressure_hpa") if past_3h else None
+    pressure_change_3h = (
+        round(current_pressure - pressure_3h_ago, 2)
+        if (current_pressure is not None and pressure_3h_ago is not None)
+        else None
+    )
+
+    derived = compute_derived_insights(
+        data, lat=lat, pressure_change_24h_hpa=pressure_change_24h, pressure_change_3h_hpa=pressure_change_3h
+    )
     meta["derived_insights"] = derived
 
     # Phase 2A: 24h trend diff against stored history (None until history exists).
     try:
-        trend = storage.compute_trend_24h(lat, lon, data)
+        trend = storage.compute_trend_24h(lat, lon, data, past=past_24h)
     except Exception as e:
         logger.warning(f"Trend computation failed for ({lat}, {lon}): {e}")
         trend = None
@@ -465,12 +496,25 @@ def get_alerts(
         try:
             snap = get_environmental_snapshot(lat=loc["lat"], lon=loc["lon"], name=loc["name"], bypass_cache=bypass_cache)
             data = snap.get("data", {}) or {}
-            current_pressure = (data.get("weather") or {}).get("pressure_hpa")
             try:
-                pressure_change_24h = storage.get_pressure_change_24h(loc["lat"], loc["lon"], current_pressure)
+                past_24h = storage.get_reading_hours_ago(loc["lat"], loc["lon"], 24, tolerance_hours=3)
             except Exception:
-                pressure_change_24h = None
-            derived = compute_derived_insights(data, lat=loc["lat"], pressure_change_24h_hpa=pressure_change_24h)
+                past_24h = None
+            try:
+                past_3h = storage.get_reading_hours_ago(loc["lat"], loc["lon"], 3)  # default 1.5h tolerance
+            except Exception:
+                past_3h = None
+            current_pressure = (data.get("weather") or {}).get("pressure_hpa")
+            pressure_change_24h = storage.get_pressure_change_24h(loc["lat"], loc["lon"], current_pressure, past=past_24h)
+            pressure_3h_ago = get_path(past_3h, "weather.pressure_hpa") if past_3h else None
+            pressure_change_3h = (
+                round(current_pressure - pressure_3h_ago, 2)
+                if (current_pressure is not None and pressure_3h_ago is not None)
+                else None
+            )
+            derived = compute_derived_insights(
+                data, lat=loc["lat"], pressure_change_24h_hpa=pressure_change_24h, pressure_change_3h_hpa=pressure_change_3h
+            )
             alerts = evaluate_alerts(
                 data, derived, lat=loc["lat"], lon=loc["lon"], history_lookup=storage.get_reading_hours_ago
             )

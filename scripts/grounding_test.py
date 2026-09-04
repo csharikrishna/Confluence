@@ -2,6 +2,8 @@
 Model Grounding Comparison Test:
 Testing NVIDIA Nemotron reasoning model (nvidia/nemotron-3-nano-omni-30b-a3b-reasoning)
 With vs Without Grounded Unified Environmental Intelligence JSON.
+
+Run from anywhere: python scripts/grounding_test.py
 """
 
 import os
@@ -10,7 +12,9 @@ import json
 import time
 import requests
 from dotenv import load_dotenv
-from env_intelligence_test import get_environmental_snapshot, LOCATION
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from environmental_data import get_environmental_snapshot, LOCATION
 
 if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -33,6 +37,8 @@ QUESTION = (
     "Chennai coastline right now, and what specific advice should be given to "
     "local artisanal fishermen, coastal residents, and outdoor workers today?"
 )
+
+OUTPUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model_grounding_comparison.json")
 
 
 def call_nvidia_model(messages, max_tokens=1024, retries=5):
@@ -113,9 +119,9 @@ def main():
         "ungrounded_response": ungrounded_response,
         "grounded_response": grounded_response,
     }
-    with open("model_grounding_comparison.json", "w", encoding="utf-8") as f:
+    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
-    print("Full test comparison saved to model_grounding_comparison.json\n")
+    print(f"Full test comparison saved to {OUTPUT_PATH}\n")
 
     print("=" * 70)
     print("RESULTS COMPARISON")

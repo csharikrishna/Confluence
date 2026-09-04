@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app import app
-from env_intelligence_test import SNAPSHOT_CACHE, STATION_CACHE
+from environmental_data import SNAPSHOT_CACHE, STATION_CACHE
 
 
 class TestCachingAndRateLimiting(unittest.TestCase):

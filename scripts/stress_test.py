@@ -1,11 +1,16 @@
 """
 Stress-Testing & Robustness Suite (Group B & C)
 Executes Tasks #4, #5, #6, #7 from the Environmental Intelligence Test Plan.
+
+Run from anywhere: python scripts/stress_test.py
 """
 
+import os
 import sys
 import json
-from env_intelligence_test import (
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from environmental_data import (
     get_environmental_snapshot,
     fetch_weather,
     fetch_marine,
@@ -20,6 +25,8 @@ from env_intelligence_test import (
 
 if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+REPORT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stress_test_report.json")
 
 
 def run_tests():
@@ -194,9 +201,9 @@ def run_tests():
     )
     print(f"OVERALL STRESS-TEST RESULT: {'ALL PASS [100%]' if all_tasks_passed else 'SOME FAILED'}")
 
-    with open("stress_test_report.json", "w", encoding="utf-8") as f:
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
-    print("Detailed report saved to stress_test_report.json\n")
+    print(f"Detailed report saved to {REPORT_PATH}\n")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@ Executes Tasks #1, #2, #3:
 - Task #2: Stricter ungrounded baseline prompt ("If you do not have live data, say so explicitly...")
 - Task #3: Second model family (meta/llama-3.2-11b-vision-instruct)
 - Task #1: Multi-condition comparisons across diverse weather (Day 2 Monsoon, Day 3 Pollution Surge)
+
+Run from anywhere: python scripts/multi_model_grounding_demo.py
 """
 
 import os
@@ -12,7 +14,9 @@ import json
 import time
 import requests
 from dotenv import load_dotenv
-from env_intelligence_test import get_environmental_snapshot, LOCATION
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from environmental_data import get_environmental_snapshot, LOCATION
 
 if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -34,6 +38,8 @@ QUESTION = (
     "Chennai coastline right now, and what specific advice should be given to "
     "local artisanal fishermen, coastal residents, and outdoor workers today?"
 )
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def call_model(model_name, messages, max_tokens=1024, retries=5):
@@ -115,9 +121,10 @@ def main():
             "grounded": grounded_resp,
         }
 
-    with open("model_comparison_two_families.json", "w", encoding="utf-8") as f:
+    two_families_path = os.path.join(SCRIPT_DIR, "model_comparison_two_families.json")
+    with open(two_families_path, "w", encoding="utf-8") as f:
         json.dump(model_comparison_results, f, indent=2, ensure_ascii=False)
-    print("\nSaved Task #2 and #3 results to model_comparison_two_families.json")
+    print(f"\nSaved Task #2 and #3 results to {two_families_path}")
 
     # -----------------------------------------------------------------------
     # Task #1: Multi-Condition Grounding (Day 2 Monsoon Rain & Day 3 Pollution Event)
@@ -196,9 +203,10 @@ def main():
         "snapshot": day2_snapshot,
         "grounded_response": day2_response,
     }
-    with open("model_grounding_comparison_day2.json", "w", encoding="utf-8") as f:
+    day2_path = os.path.join(SCRIPT_DIR, "model_grounding_comparison_day2.json")
+    with open(day2_path, "w", encoding="utf-8") as f:
         json.dump(day2_record, f, indent=2, ensure_ascii=False)
-    print("Saved Day 2 results to model_grounding_comparison_day2.json")
+    print(f"Saved Day 2 results to {day2_path}")
 
     # Condition 3: Post-Monsoon Industrial Thermal Inversion / Severe Pollution Surge
     day3_snapshot = {
@@ -270,9 +278,10 @@ def main():
         "snapshot": day3_snapshot,
         "grounded_response": day3_response,
     }
-    with open("model_grounding_comparison_day3.json", "w", encoding="utf-8") as f:
+    day3_path = os.path.join(SCRIPT_DIR, "model_grounding_comparison_day3.json")
+    with open(day3_path, "w", encoding="utf-8") as f:
         json.dump(day3_record, f, indent=2, ensure_ascii=False)
-    print("Saved Day 3 results to model_grounding_comparison_day3.json")
+    print(f"Saved Day 3 results to {day3_path}")
 
     print("\n" + "=" * 75)
     print("ALL GROUP A EXPERIMENTS COMPLETED SUCCESSFULLY!")

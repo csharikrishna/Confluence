@@ -34,14 +34,14 @@
     "message": "Marine warning '{value}' in effect (wave {wave}m, wind {wind}km/h). Do not launch small or artisanal vessels."
   },
   {
-    "id": "storm_level_wind",
-    "description": "Sustained storm-force wind",
+    "id": "strong_sustained_wind",
+    "description": "Beaufort force 6+ sustained wind (general public advisory, distinct from the marine-specific small_craft_unsafe rule)",
     "type": "threshold",
     "field": "data.weather.wind_speed_kmh",
     "operator": "gt",
     "threshold": 40,
-    "severity": "high",
-    "message": "Storm-level sustained wind at {value} km/h."
+    "severity": "medium",
+    "message": "Strong sustained wind at {value} km/h (Beaufort force 6+) - secure loose outdoor objects."
   },
   {
     "id": "gale_gusts",

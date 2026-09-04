@@ -152,6 +152,28 @@ class TestStorage(unittest.TestCase):
         storage.DB_PATH = os.path.join(self._tmp_path + "_nonexistent_dir", "db.sqlite")
         self.assertFalse(storage.is_healthy())
 
+    def test_prune_old_alerts_removes_stale_rows(self):
+        old_time = datetime.now(timezone.utc) - timedelta(days=100)
+        recent_time = datetime.now(timezone.utc)
+        conn = storage._connect()
+        conn.execute(
+            "INSERT INTO alerts_log (lat, lon, rule_id, severity, message, triggered_at, value) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (13.08, 80.27, "old_rule", "high", "old", _iso(old_time), json.dumps(1.0)),
+        )
+        conn.execute(
+            "INSERT INTO alerts_log (lat, lon, rule_id, severity, message, triggered_at, value) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (13.08, 80.27, "recent_rule", "high", "recent", _iso(recent_time), json.dumps(2.0)),
+        )
+        conn.commit()
+        conn.close()
+
+        deleted = storage.prune_old_alerts(retention_days=90)
+        self.assertEqual(deleted, 1)
+
+        remaining = storage.get_alert_history(13.08, 80.27)
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0]["rule_id"], "recent_rule")
+
     def test_log_alert_allows_after_cooldown_expires(self):
         old_alert = {
             "id": "pm25_unhealthy", "severity": "high", "message": "old",
