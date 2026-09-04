@@ -2,7 +2,11 @@ services:
   - type: web
     name: confluence
     env: python
-    buildCommand: pip install -r requirements.txt
+    # pymongo is installed unconditionally (small dependency) so flipping
+    # STORAGE_BACKEND=mongo is a pure env-var change — no build step to
+    # remember and get wrong. requirements-gdrive.txt stays opt-in (heavier,
+    # less commonly used) — add it here too if you enable GDRIVE_ENABLED.
+    buildCommand: pip install -r requirements.txt -r requirements-mongo.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAQ_API_KEY
@@ -11,10 +15,33 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.12.0
-      # Phase 2 (optional, both safe to leave unset):
+      # Phase 2 (optional, all safe to leave unset):
       - key: CONFLUENCE_DB_PATH
         sync: false
       - key: ALERT_WEBHOOK_URL
+        sync: false
+      # Optional durable storage backend. STORAGE_BACKEND=mongo (recommended —
+      # MongoDB Atlas free tier, fully managed, no card required) needs only
+      # MONGODB_URI below. STORAGE_BACKEND=couchdb needs a separately-hosted
+      # CouchDB server instead (kept available, not the recommended path).
+      # Leave STORAGE_BACKEND unset for SQLite (default).
+      - key: STORAGE_BACKEND
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: COUCHDB_URL
+        sync: false
+      - key: COUCHDB_USER
+        sync: false
+      - key: COUCHDB_PASSWORD
+        sync: false
+      # Optional daily Google Drive backup (requires requirements-gdrive.txt
+      # installed — add a second buildCommand step if enabling this).
+      - key: GDRIVE_ENABLED
+        sync: false
+      - key: GDRIVE_FOLDER_ID
+        sync: false
+      - key: GDRIVE_SERVICE_ACCOUNT_JSON
         sync: false
     # --- Persistent history storage (requires a paid Render plan) ---
     # Render's free tier has an ephemeral filesystem: confluence_history.db is

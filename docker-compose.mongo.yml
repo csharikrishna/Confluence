@@ -1,0 +1,27 @@
+# Local/dev MongoDB for testing the STORAGE_BACKEND=mongo path against a real
+# server before pointing it at Atlas. Atlas itself needs no local container —
+# this is purely a local stand-in for development/verification.
+#
+# Note: if you already have a local mongod running (check with
+# `netstat -ano | grep :27017` / Get-Process mongod), just point MONGODB_URI
+# at that instead of starting this — no need for two. If you do run both,
+# Windows may let a container's 0.0.0.0:27017 bind coexist with an existing
+# process's more specific 127.0.0.1:27017 bind without erroring, but
+# "localhost" will resolve to whichever one already held that specific
+# address first — confusing to debug, so avoid running both at once.
+#
+# Start:  docker compose -f docker-compose.mongo.yml up -d
+# Stop:   docker compose -f docker-compose.mongo.yml down
+# Wipe:   docker compose -f docker-compose.mongo.yml down -v
+services:
+  mongo:
+    image: mongo:7
+    container_name: confluence-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - confluence_mongo_data:/data/db
+
+volumes:
+  confluence_mongo_data:

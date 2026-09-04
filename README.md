@@ -2,7 +2,7 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/Tests-112%20Total%20(108%20Offline%20%2B%204%20Remote)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-185%20Total%20(181%20Offline%20%2B%204%20Remote)-brightgreen.svg)](tests/)
 [![CI](https://github.com/csharikrishna/Confluence/actions/workflows/tests.yml/badge.svg)](.github/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Render](https://img.shields.io/badge/Deploy-Render-46E3B7.svg?logo=render&logoColor=white)](https://confluence-si41.onrender.com)
@@ -281,6 +281,10 @@ Rules cover unhealthy PM2.5, unsafe sea state, storm-level wind/gusts, heavy-rai
 
 > **Note on Render's free tier:** its filesystem is ephemeral — a redeploy or restart wipes `confluence_history.db`. History still accumulates correctly between restarts (it's a real file, not in-memory), it just isn't durable across deploys until a persistent disk is attached. Set `CONFLUENCE_DB_PATH` to relocate the DB file if you do add one.
 
+### Pluggable storage backend + optional Google Drive backup
+
+The history store is backend-agnostic: `storage.py` (SQLite, default), `mongo_storage.py` (**recommended** for durable history — MongoDB Atlas's free M0 tier, fully managed, no credit card), and `couchdb_storage.py` (kept available but not recommended — needs a self-hosted server) all expose identical function signatures, selected via `STORAGE_BACKEND=sqlite|mongo|couchdb` — see `db_backend.py`. Mongo needs only `MONGODB_URI` (plus `pip install -r requirements-mongo.txt`); CouchDB needs a separately-run server and `COUCHDB_URL`/`COUCHDB_USER`/`COUCHDB_PASSWORD`. Separately, `gdrive_backup.py` can push a daily JSON export of recent history to a Google Drive folder as a disaster-recovery copy (`GDRIVE_ENABLED` + a service account — see `requirements-gdrive.txt`) — this is a backup, not a live queryable store. All three storage backends have been verified against real running instances, not just mocks. Full setup instructions and honest caveats, including why CouchDB was dropped in favor of Mongo: [docs/PHASE2_WALKTHROUGH.md](docs/PHASE2_WALKTHROUGH.md) Part 4.
+
 ### Explicitly out of scope (Phase 2)
 No ML/forecasting, no new data sources beyond the existing 7, no user accounts or per-user alert subscriptions, no UI, no message-queue infra — see [docs/phase2-plan.md](docs/phase2-plan.md) §7 for the full rationale.
 
@@ -290,13 +294,13 @@ No ML/forecasting, no new data sources beyond the existing 7, no user accounts o
 
 Confluence includes dedicated test suites covering offline mock unit tests, live remote verification, and failure isolation, across both Phase 1 and Phase 2:
 
-### 1. Offline Unit & Mocked Integration Suite (108 Tests)
-Validates boundary sanity checks, canonical ISO UTC normalization, coordinate validation, isolated failure degradation, the physics-informed derived insights, the rules engine (including the Phase 1 Day 2 monsoon-squall fixture and a false-positive check on calm data), the SQLite history store, the locations registry, the alert webhook, and every endpoint — all without external network calls. This suite runs automatically on every push/PR via [`.github/workflows/tests.yml`](.github/workflows/tests.yml):
+### 1. Offline Unit & Mocked Integration Suite (181 Tests)
+Validates boundary sanity checks, canonical ISO UTC normalization, coordinate validation, isolated failure degradation, the physics-informed derived insights, the rules engine (including the Phase 1 Day 2 monsoon-squall fixture and a false-positive check on calm data), all three history-store backends (SQLite, MongoDB, CouchDB), the locations registry, the alert webhook, and every endpoint — all without external network calls. This suite runs automatically on every push/PR via [`.github/workflows/tests.yml`](.github/workflows/tests.yml):
 ```bash
 pytest tests/ --ignore=tests/test_live_remote.py -v
 ```
 ```text
-======================== 108 passed in ~5s ========================
+======================== 181 passed in ~6s ========================
 ```
 
 ### 2. Live Remote Deployment Suite (4 Tests)

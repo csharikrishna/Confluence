@@ -13,7 +13,7 @@ import os
 import logging
 import requests
 
-import storage
+import db_backend as storage
 
 logger = logging.getLogger("environmental_api")
 

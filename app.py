@@ -32,8 +32,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from env_intelligence_test import get_environmental_snapshot, validate_coordinates
-import storage
+import db_backend as storage
 import notifications
+import gdrive_backup
 from locations import get_all_locations
 from derived_insights import compute_derived_insights
 from rules_engine import evaluate_alerts
@@ -100,10 +101,31 @@ async def lifespan(app: FastAPI):
 
         keep_alive_task = asyncio.create_task(_keep_alive())
 
+    # 3. Optional: daily Google Drive backup of recent history (disaster-recovery
+    #    copy, not the live store — see gdrive_backup.py). Fully inert unless
+    #    GDRIVE_ENABLED + credentials are configured.
+    backup_task = None
+    if gdrive_backup.is_configured():
+        logger.info("Google Drive daily backup enabled.")
+
+        async def _daily_backup():
+            while True:
+                await asyncio.sleep(86400)  # once a day
+                try:
+                    export = gdrive_backup.build_export(get_all_locations(), storage, days=7)
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, gdrive_backup.backup_export, export)
+                except Exception as e:
+                    logger.warning(f"Daily Google Drive backup failed: {e}")
+
+        backup_task = asyncio.create_task(_daily_backup())
+
     yield
 
     if keep_alive_task:
         keep_alive_task.cancel()
+    if backup_task:
+        backup_task.cancel()
     logger.info("API shutdown complete.")
 
 
@@ -214,17 +236,26 @@ def root():
 @app.get("/health", tags=["Health"])
 def health_check():
     db_ok = storage.is_healthy()
+    # Avoid leaking the server's absolute filesystem path for the sqlite backend;
+    # the couchdb/mongo backends' DB_PATH is already just a host, safe as-is.
+    history_store_desc = (
+        f"sqlite ({os.path.basename(storage.DB_PATH)})"
+        if storage.BACKEND_NAME == "sqlite"
+        else storage.DB_PATH
+    )
     return {
         "status": "healthy" if db_ok else "degraded",
         "service": "environmental-intelligence-api",
         "concurrency": "enabled (ThreadPoolExecutor)",
         "rate_limiting": "enabled (slowapi 30/min)",
         "caching": "enabled (TTLCache 5m)",
-        "history_store": f"sqlite ({os.path.basename(storage.DB_PATH)})",
+        "history_store": history_store_desc,
         "history_store_status": "connected" if db_ok else "unreachable",
+        "history_store_backend": storage.BACKEND_NAME,
         "registered_locations": len(get_all_locations()),
         "alerting": "rule-based (config-driven, no ML)",
         "alert_webhook": "configured" if notifications.WEBHOOK_URL else "not configured",
+        "gdrive_backup": "configured" if gdrive_backup.is_configured() else "not configured",
         "phase": 2,
     }
 
