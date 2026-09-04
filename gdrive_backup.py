@@ -1,9 +1,9 @@
 """
 Optional Google Drive backup — a disaster-recovery convenience, NOT a live
-database. Whatever storage backend is active (storage.py/SQLite,
-mongo_storage.py/MongoDB, or couchdb_storage.py/CouchDB — see db_backend.py)
-remains the actual source of truth this app reads and writes on every
-request. This module just uploads a periodic point-in-time JSON export of
+database. Whatever storage backend is active (storage.py/SQLite or
+mongo_storage.py/MongoDB — see db_backend.py) remains the actual source of
+truth this app reads and writes on every request. This module just uploads a
+periodic point-in-time JSON export of
 recent history to a Drive folder, so there's an off-platform copy if the
 primary store is ever lost.
 
@@ -112,7 +112,7 @@ def backup_export(export_rows, filename_prefix="confluence_backup"):
 def build_export(locations, storage_module, days=7):
     """Gather recent history for every given location into one export payload,
     using whatever storage backend is passed in (db_backend, or storage.py /
-    couchdb_storage.py directly). Kept separate from backup_export() so it's
+    mongo_storage.py directly). Kept separate from backup_export() so it's
     trivial to unit test without touching the Drive API.
     """
     from datetime import timedelta

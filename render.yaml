@@ -22,18 +22,12 @@ services:
         sync: false
       # Optional durable storage backend. STORAGE_BACKEND=mongo (recommended —
       # MongoDB Atlas free tier, fully managed, no card required) needs only
-      # MONGODB_URI below. STORAGE_BACKEND=couchdb needs a separately-hosted
-      # CouchDB server instead (kept available, not the recommended path).
-      # Leave STORAGE_BACKEND unset for SQLite (default).
+      # MONGODB_URI below. Leave STORAGE_BACKEND unset for SQLite (default).
+      # (A CouchDB backend was built and verified, then archived to the
+      # archive/couchdb-backend branch — Mongo covers everything it would have.)
       - key: STORAGE_BACKEND
         sync: false
       - key: MONGODB_URI
-        sync: false
-      - key: COUCHDB_URL
-        sync: false
-      - key: COUCHDB_USER
-        sync: false
-      - key: COUCHDB_PASSWORD
         sync: false
       # Optional daily Google Drive backup (requires requirements-gdrive.txt
       # installed — add a second buildCommand step if enabling this).

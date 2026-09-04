@@ -2,7 +2,7 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/Tests-185%20Total%20(181%20Offline%20%2B%204%20Remote)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-171%20Total%20(167%20Offline%20%2B%204%20Remote)-brightgreen.svg)](tests/)
 [![CI](https://github.com/csharikrishna/Confluence/actions/workflows/tests.yml/badge.svg)](.github/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Render](https://img.shields.io/badge/Deploy-Render-46E3B7.svg?logo=render&logoColor=white)](https://confluence-si41.onrender.com)
@@ -50,7 +50,7 @@ Built to **ground frontier AI models** and maritime decision systems in empirica
 - **Data-quality sentinel** — every response is checked against physical boundaries (no negative wave heights, no >100% humidity, no out-of-range pressure) before it's returned.
 - **Production-hardened** — rate limiting, a global exception handler that never leaks stack traces, structured request logging, and a CI gate that runs the full test suite on every push.
 - **Physics-informed reasoning layer** — composite signals (heat index, sea state, storm potential, coastal flood risk, tsunami advisory) computed from cited meteorological/oceanographic standards, plus a config-driven alerting engine — see [Phase 2](#phase-2--history-trends--alerting).
-- **Pluggable, verified storage** — SQLite by default, with MongoDB Atlas or CouchDB as drop-in durable backends, each verified against a real running instance, not just mocks.
+- **Pluggable, verified storage** — SQLite by default, with MongoDB Atlas as a drop-in durable backend, verified against a real running instance, not just mocks.
 
 ---
 
@@ -132,7 +132,6 @@ Confluence/
 ├── db_backend.py             # Storage backend selector (STORAGE_BACKEND env var)
 ├── storage.py                # SQLite backend (default)
 ├── mongo_storage.py          # MongoDB Atlas backend (recommended for durable history)
-├── couchdb_storage.py        # CouchDB backend (kept available, not recommended)
 │
 ├── tests/                    # pytest suite — offline (mocked) + live-remote
 ├── scripts/                  # Standalone demo/PoC tools, not part of the app or test suite
@@ -143,7 +142,7 @@ Confluence/
 │
 ├── docs/                     # Design docs and phase write-ups
 ├── render.yaml, Procfile     # Render deployment config
-├── docker-compose.*.yml      # Local CouchDB/MongoDB for backend development
+├── docker-compose.mongo.yml  # Local MongoDB for backend development
 └── requirements*.txt         # Base + optional (mongo, gdrive) dependencies
 ```
 
@@ -302,9 +301,19 @@ Rules cover unhealthy PM2.5, unsafe sea state, strong sustained wind (Beaufort 6
 
 ### Storage backends
 
-The history store is backend-agnostic — `storage.py` (SQLite, default), `mongo_storage.py` (**recommended** for durable history: MongoDB Atlas's free tier, fully managed, no credit card), and `couchdb_storage.py` (available but not recommended — needs a self-hosted server) all expose identical function signatures, selected via `STORAGE_BACKEND=sqlite|mongo|couchdb`. All three are verified against real running instances, not just mocks. Full setup and the reasoning behind the Mongo recommendation: [`docs/PHASE2_WALKTHROUGH.md`](docs/PHASE2_WALKTHROUGH.md).
+The history store is backend-agnostic — `storage.py` (SQLite, default) and `mongo_storage.py` (**recommended** for durable history: MongoDB Atlas's free tier, fully managed, no credit card) expose identical function signatures, selected via `STORAGE_BACKEND=sqlite|mongo` in `db_backend.py`. Both are verified against real running instances, not just mocks. Full setup and the reasoning behind the Mongo recommendation: [`docs/PHASE2_WALKTHROUGH.md`](docs/PHASE2_WALKTHROUGH.md).
 
-Separately, `gdrive_backup.py` can push a daily JSON export of recent history to Google Drive as a disaster-recovery copy — a backup, not a live queryable store.
+Separately, `gdrive_backup.py` can push a daily JSON export of recent history to Google Drive as a disaster-recovery copy — a backup, not a live queryable store. It's inert unless `GDRIVE_ENABLED=true` is explicitly set.
+
+**What's actually running where:** locally and by default, that's SQLite with Drive backup off. This project's own Render deployment has `STORAGE_BACKEND=mongo` set, so production runs on MongoDB Atlas — check your own `render.yaml` env vars if you're unsure which is live for your deployment.
+
+A CouchDB backend (`couchdb_storage.py`) was also built and verified against a real instance, then archived — see [Archived backends](#archived-backends) below.
+
+### Archived backends
+
+A CouchDB REST-client backend was built alongside Mongo, run against a real local CouchDB 3.5 (via `docker-compose.couchdb.yml`), and verified end to end through `/environment`, `/environment/history`, and `/alerts` — including catching a real Mango query-sort bug mocks alone wouldn't have. It was then removed from `main` rather than left dormant: Mongo already covers everything it would (managed, free, no self-hosted server to run), so keeping two dormant durable backends around was clutter, not future-proofing.
+
+Nothing was deleted — the full implementation, its tests, and the compose file live on the `archive/couchdb-backend` branch, and the reasoning/verification notes are still in [`docs/PHASE2_WALKTHROUGH.md`](docs/PHASE2_WALKTHROUGH.md) Part 4. `git checkout archive/couchdb-backend` to bring it back if CouchDB's offline-sync/multi-writer model ever becomes genuinely relevant (e.g. physical sensors syncing intermittently from boats) — until then, `db_backend.py` treats `STORAGE_BACKEND=couchdb` as an unrecognized value and safely falls back to SQLite instead of erroring.
 
 ### Explicitly out of scope (Phase 2)
 
@@ -314,9 +323,9 @@ No ML/forecasting, no new data sources beyond the existing 7, no user accounts o
 
 ## Testing
 
-### Offline unit & mocked integration suite (181 tests)
+### Offline unit & mocked integration suite (167 tests)
 
-Boundary sanity checks, ISO-UTC normalization, coordinate validation, isolated failure degradation, the physics-informed derived insights, the rules engine (including a real monsoon-squall scenario and an explicit false-positive check on calm data), all three storage backends, the locations registry, and every endpoint — no network calls. Runs automatically on every push via [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
+Boundary sanity checks, ISO-UTC normalization, coordinate validation, isolated failure degradation, the physics-informed derived insights, the rules engine (including a real monsoon-squall scenario and an explicit false-positive check on calm data), both storage backends, the locations registry, and every endpoint — no network calls. Runs automatically on every push via [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 
 ```bash
 pytest tests/ --ignore=tests/test_live_remote.py -v

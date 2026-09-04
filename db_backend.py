@@ -1,13 +1,19 @@
 """
 Storage backend selector. Set STORAGE_BACKEND to "mongo" (recommended durable
-option — see mongo_storage.py) or "couchdb" (kept dormant/available, see
-couchdb_storage.py) to switch off SQLite; leave unset/"sqlite" (default) to
-keep using storage.py exactly as before.
+option — see mongo_storage.py) to switch off SQLite; leave unset/"sqlite"
+(default) to keep using storage.py exactly as before.
+
+A CouchDB backend (couchdb_storage.py) was built and verified against a real
+instance, then archived to the `archive/couchdb-backend` branch — Mongo covers
+everything it would have, and keeping two dormant durable backends on main was
+just clutter. If STORAGE_BACKEND=couchdb is still set somewhere (e.g. a stale
+Render env var), it now falls through to the sqlite default below rather than
+erroring, same as any other unrecognized value.
 
 Both app.py and notifications.py import THIS module (aliased `as storage`)
-rather than importing storage.py/couchdb_storage.py/mongo_storage.py
-directly, so there's a single place that decides which backend is live — no
-risk of one module writing to SQLite while another reads from Mongo.
+rather than importing storage.py/mongo_storage.py directly, so there's a
+single place that decides which backend is live — no risk of one module
+writing to SQLite while another reads from Mongo.
 
 Implementation note: the functions below are bound directly to the active
 backend module's function objects (not copied/wrapped), so they still read
@@ -20,11 +26,10 @@ db_backend.save_snapshot IS storage.save_snapshot when STORAGE_BACKEND=sqlite
 import os
 
 import storage as _sqlite
-import couchdb_storage as _couchdb
 import mongo_storage as _mongo
 
 BACKEND_NAME = os.getenv("STORAGE_BACKEND", "sqlite").strip().lower()
-_BACKENDS = {"couchdb": _couchdb, "mongo": _mongo}
+_BACKENDS = {"mongo": _mongo}
 _active = _BACKENDS.get(BACKEND_NAME, _sqlite)
 
 init_db = _active.init_db

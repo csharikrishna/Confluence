@@ -238,7 +238,7 @@ def root():
 def health_check():
     db_ok = storage.is_healthy()
     # Avoid leaking the server's absolute filesystem path for the sqlite backend;
-    # the couchdb/mongo backends' DB_PATH is already just a host, safe as-is.
+    # the mongo backend's DB_PATH is already just a host, safe as-is.
     history_store_desc = (
         f"sqlite ({os.path.basename(storage.DB_PATH)})"
         if storage.BACKEND_NAME == "sqlite"
@@ -318,7 +318,7 @@ def get_environment(
     # trend_24h and the rapid-pressure-fall signal both need the same "reading
     # ~24h ago" lookup — fetch it once and hand it to both, rather than each
     # triggering its own identical DB round-trip (doubles latency against the
-    # remote Mongo/CouchDB backends otherwise). None until history exists.
+    # remote Mongo backend otherwise). None until history exists.
     try:
         past_24h = storage.get_reading_hours_ago(lat, lon, 24, tolerance_hours=3)
     except Exception as e:

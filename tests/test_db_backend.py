@@ -1,12 +1,14 @@
 """
 Tests for the storage backend selector (db_backend.py). Confirms the default
-(no STORAGE_BACKEND set) resolves to storage.py's SQLite functions, and that
-setting STORAGE_BACKEND=couchdb resolves to couchdb_storage.py's instead.
+(no STORAGE_BACKEND set) resolves to storage.py's SQLite functions, that
+setting STORAGE_BACKEND=mongo resolves to mongo_storage.py's instead, and that
+STORAGE_BACKEND=couchdb (the now-archived backend — see db_backend.py's
+docstring) safely falls back to sqlite rather than erroring.
 
 Reloads db_backend to re-run its module-level selection logic under different
 env vars — always restored to the sqlite default in tearDown, since db_backend
 is a shared singleton module that app.py/notifications.py also import; leaving
-it pointed at couchdb would affect every other test in the session.
+it pointed at mongo would affect every other test in the session.
 """
 
 import os
@@ -17,7 +19,6 @@ import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import storage
-import couchdb_storage
 import mongo_storage
 import db_backend
 
@@ -34,13 +35,15 @@ class TestDbBackendSelector(unittest.TestCase):
         self.assertIs(db_backend.save_snapshot, storage.save_snapshot)
         self.assertIs(db_backend.DB_PATH, storage.DB_PATH)
 
-    def test_couchdb_backend_selected_via_env_var(self):
+    def test_archived_couchdb_value_falls_back_to_sqlite(self):
+        # couchdb_storage.py was archived to the archive/couchdb-backend branch.
+        # A leftover STORAGE_BACKEND=couchdb (e.g. a stale Render env var) must
+        # not crash the app — it should behave like any other unrecognized value.
         os.environ["STORAGE_BACKEND"] = "couchdb"
         importlib.reload(db_backend)
 
         self.assertEqual(db_backend.BACKEND_NAME, "couchdb")
-        self.assertIs(db_backend.save_snapshot, couchdb_storage.save_snapshot)
-        self.assertIs(db_backend.get_reading_hours_ago, couchdb_storage.get_reading_hours_ago)
+        self.assertIs(db_backend.save_snapshot, storage.save_snapshot)
 
     def test_mongo_backend_selected_via_env_var(self):
         os.environ["STORAGE_BACKEND"] = "mongo"
@@ -54,7 +57,7 @@ class TestDbBackendSelector(unittest.TestCase):
         os.environ["STORAGE_BACKEND"] = "something_else"
         importlib.reload(db_backend)
         self.assertEqual(db_backend.BACKEND_NAME, "something_else")
-        # Falls back to sqlite functions since only "couchdb" switches away from it.
+        # Falls back to sqlite functions since only "mongo" switches away from it.
         self.assertIs(db_backend.save_snapshot, storage.save_snapshot)
 
 
