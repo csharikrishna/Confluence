@@ -148,19 +148,6 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
               </button>
             )}
 
-            {/* Quick AI Drawer Launch Button */}
-            <button 
-              type="button"
-              className="btn-ai-assistant"
-              onClick={onOpenChat}
-              id="open-chat-drawer-btn"
-              title="Open Floating Coastal AI Assistant"
-              aria-label="Open Floating Coastal AI Assistant"
-            >
-              <Sparkles size={15} aria-hidden="true" />
-              <span className="btn-ai-text">Ask Coastal AI</span>
-            </button>
-
             {/* Mobile Menu Toggle Button */}
             <button 
               type="button"

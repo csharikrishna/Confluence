@@ -116,61 +116,81 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation })
   if (!isOpen) return null;
 
   return (
-    <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
-        {/* Drawer Header */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--border-color)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'var(--bg-card-subtle)',
-        }}>
+    <>
+      {/* Mobile-only backdrop so tap-outside closes it on small screens */}
+      <div 
+        className="floating-chat-mobile-backdrop" 
+        onClick={onClose}
+        aria-hidden="true" 
+      />
+
+      {/* Small floating chat window */}
+      <aside 
+        className="floating-chat-window" 
+        role="dialog" 
+        aria-label="Coastal AI Assistant"
+      >
+        {/* Floating Window Header */}
+        <div className="floating-chat-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               width: '32px',
               height: '32px',
               borderRadius: '8px',
-              background: 'var(--accent-primary)',
+              background: 'linear-gradient(135deg, #0891B2 0%, #0E7490 100%)',
               color: '#FFFFFF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(8, 145, 178, 0.25)',
             }}>
-              <Sparkles size={18} />
+              <Sparkles size={16} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                Grounded Coastal AI
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                  Coastal AI
+                </span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.64rem',
+                  fontWeight: 600,
+                  color: '#047857',
+                  background: '#ECFDF5',
+                  padding: '1px 5px',
+                  borderRadius: '999px',
+                  border: '1px solid #A7F3D0',
+                }}>
+                  <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#059669' }} />
+                  7 Feeds Live
+                </span>
               </div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                Live Tool-Calling • Deterministic Grounding
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Deterministic Tool-Calling
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
             <button 
+              type="button"
               onClick={clearChat}
               title="Clear History"
-              style={{
-                color: 'var(--text-muted)',
-                padding: '6px',
-                borderRadius: '6px',
-              }}
+              className="chat-action-btn"
+              aria-label="Clear chat history"
             >
-              <Trash2 size={16} />
+              <Trash2 size={15} />
             </button>
             <button 
+              type="button"
               onClick={onClose}
-              style={{
-                color: 'var(--text-secondary)',
-                padding: '6px',
-                borderRadius: '6px',
-              }}
+              title="Close Floating Chat"
+              className="chat-action-btn"
+              aria-label="Close floating chat window"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
@@ -367,7 +387,7 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation })
             Deterministic grounding: unverified claims blocked via physical tool validation.
           </div>
         </div>
-      </div>
-    </div>
+      </aside>
+    </>
   );
 }
