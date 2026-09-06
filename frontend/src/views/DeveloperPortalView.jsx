@@ -143,15 +143,18 @@ export function DeveloperPortalView({
   };
 
   const currentDisplayKey = createdRawKey || activeKeyPrefix;
+  const apiBase = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' 
+    ? window.location.origin 
+    : 'https://confluence-si41.onrender.com';
 
   const codeSnippets = {
-    curl: `curl -X GET "https://confluence-ocean.onrender.com/environment?lat=${snippetStation.lat}&lon=${snippetStation.lon}&name=${encodeURIComponent(snippetStation.name)}" \\
+    curl: `curl -X GET "${apiBase}/environment?lat=${snippetStation.lat}&lon=${snippetStation.lon}&name=${encodeURIComponent(snippetStation.name)}" \\
   -H "X-API-Key: ${currentDisplayKey}" \\
   -H "Accept: application/json"`,
 
     python: `import requests
 
-url = "https://confluence-ocean.onrender.com/environment"
+url = "${apiBase}/environment"
 params = {
     "lat": ${snippetStation.lat},
     "lon": ${snippetStation.lon},
@@ -169,7 +172,7 @@ print(f"Significant Wave Height: {telemetry['data']['marine']['wave_height_m']} 
 print(f"Heat Index: {telemetry['data']['derived_insights']['heat_index_c']} °C")`,
 
     javascript: `// Confluence Coastal Telemetry API Client
-const endpoint = new URL("https://confluence-ocean.onrender.com/environment");
+const endpoint = new URL("${apiBase}/environment");
 endpoint.searchParams.set("lat", "${snippetStation.lat}");
 endpoint.searchParams.set("lon", "${snippetStation.lon}");
 endpoint.searchParams.set("name", "${snippetStation.name}");
