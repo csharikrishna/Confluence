@@ -9,7 +9,9 @@ import {
   ShieldCheck, 
   User, 
   LogOut,
-  ExternalLink
+  ExternalLink,
+  Sparkles,
+  ChevronRight
 } from 'lucide-react';
 
 export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) {
@@ -28,7 +30,7 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
 
       <header className="site-header" role="banner">
         <div className="header-inner">
-          {/* Brand */}
+          {/* Brand Section */}
           <div 
             className="brand-section" 
             onClick={() => handleTabClick('overview')}
@@ -40,18 +42,17 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
                 handleTabClick('overview');
               }
             }}
-            aria-label="Confluence Home"
+            aria-label="Confluence Platform Home"
           >
             <div className="brand-icon-wrapper" aria-hidden="true">
-              <Radio size={22} />
+              <Radio size={20} />
             </div>
-            <div>
-              <div className="brand-title">
-                Confluence
+            <div className="brand-text-block">
+              <div className="brand-title-row">
+                <span className="brand-title">Confluence</span>
+                <span className="brand-live-badge">LIVE</span>
               </div>
-              <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '-2px' }}>
-                Coastal Environmental Platform
-              </div>
+              <span className="brand-subtitle">Coastal Environmental Platform</span>
             </div>
           </div>
 
@@ -63,7 +64,7 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
               onClick={() => handleTabClick('overview')}
               aria-current={activeTab === 'overview' ? 'page' : undefined}
             >
-              <Activity size={16} aria-hidden="true" />
+              <Activity size={15} aria-hidden="true" />
               <span>Overview & Telemetry</span>
             </button>
 
@@ -73,7 +74,7 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
               onClick={() => handleTabClick('chatbot')}
               aria-current={activeTab === 'chatbot' ? 'page' : undefined}
             >
-              <MessageSquare size={16} aria-hidden="true" />
+              <MessageSquare size={15} aria-hidden="true" />
               <span>Coastal Chatbot</span>
             </button>
             
@@ -83,7 +84,7 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
               onClick={() => handleTabClick('developer')}
               aria-current={activeTab === 'developer' ? 'page' : undefined}
             >
-              <Key size={16} aria-hidden="true" />
+              <Key size={15} aria-hidden="true" />
               <span>Developer Portal</span>
               {user && (
                 <span className="nav-tab-badge">
@@ -98,36 +99,37 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
               onClick={() => handleTabClick('health')}
               aria-current={activeTab === 'health' ? 'page' : undefined}
             >
-              <ShieldCheck size={16} aria-hidden="true" />
+              <ShieldCheck size={15} aria-hidden="true" />
               <span>Upstream Health</span>
-              <span className="nav-tab-badge" style={{ background: '#ECFDF5', color: '#047857', fontWeight: 600 }}>
+              <span className="nav-tab-badge nav-tab-badge-live">
+                <span className="badge-pulse-dot" aria-hidden="true" />
                 7 Live
               </span>
             </button>
           </nav>
 
-          {/* Header Actions */}
+          {/* Right Header Actions */}
           <div className="header-actions">
+            {/* User Account / Login Status */}
             {user ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="header-user-wrapper">
                 <button 
                   type="button"
                   className="user-status-pill"
                   onClick={() => handleTabClick('developer')}
                   title="Manage API Keys"
-                  aria-label={`User account: ${user.username}, with ${user.api_keys?.length || 0} active keys`}
+                  aria-label={`User account: ${user.username || user.name}, ${user.api_keys?.length || 0} active keys`}
                 >
-                  <div className="user-status-dot" aria-hidden="true" />
-                  <span>{user.username}</span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    ({user.api_keys?.length || 0} keys)
+                  <span className="user-status-dot" aria-hidden="true" />
+                  <span className="user-name-text">{user.username || user.name || "Developer"}</span>
+                  <span className="user-key-count">
+                    ({user.api_keys?.length || 0} {user.api_keys?.length === 1 ? 'key' : 'keys'})
                   </span>
                 </button>
                 <button 
                   type="button"
                   onClick={onLogout}
-                  className="btn-secondary"
-                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                  className="btn-header-signout"
                   title="Sign Out"
                   aria-label="Sign out of developer account"
                 >
@@ -137,28 +139,29 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
             ) : (
               <button 
                 type="button"
-                className="btn-secondary"
+                className="btn-header-login"
                 onClick={() => handleTabClick('developer')}
-                style={{ fontSize: '0.84rem', padding: '8px 14px' }}
                 aria-label="Developer Access & API Keys"
               >
-                <User size={15} aria-hidden="true" />
-                <span>Developer Access</span>
+                <User size={14} aria-hidden="true" />
+                <span>Dev Access</span>
               </button>
             )}
 
+            {/* Quick AI Drawer Launch Button */}
             <button 
               type="button"
               className="btn-ai-assistant"
               onClick={onOpenChat}
               id="open-chat-drawer-btn"
-              aria-label="Open Coastal AI Assistant Drawer"
+              title="Open Floating Coastal AI Assistant"
+              aria-label="Open Floating Coastal AI Assistant"
             >
-              <MessageSquare size={16} aria-hidden="true" />
-              <span>Coastal Chatbot</span>
+              <Sparkles size={15} aria-hidden="true" />
+              <span className="btn-ai-text">Ask Coastal AI</span>
             </button>
 
-            {/* Mobile Menu Toggle */}
+            {/* Mobile Menu Toggle Button */}
             <button 
               type="button"
               className="mobile-menu-btn"
@@ -171,70 +174,117 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
           </div>
         </div>
 
-        {/* Mobile Drawer Menu */}
+        {/* Mobile Navigation Drawer Overlay */}
         {mobileMenuOpen && (
-          <nav 
-            className="mobile-drawer-menu"
-            style={{
-              background: '#FFFFFF',
-              borderBottom: '1px solid var(--border-color)',
-              padding: '16px 20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-            }}
-            aria-label="Mobile Navigation"
-          >
-            <button 
-              type="button"
-              className={`nav-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-              onClick={() => handleTabClick('overview')}
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '12px 16px' }}
-            >
-              <Activity size={18} aria-hidden="true" />
-              <span>Overview & Telemetry</span>
-            </button>
+          <nav className="mobile-drawer-menu" aria-label="Mobile Navigation">
+            <div className="mobile-nav-links">
+              <button 
+                type="button"
+                className={`mobile-nav-btn ${activeTab === 'overview' ? 'active' : ''}`}
+                onClick={() => handleTabClick('overview')}
+              >
+                <div className="mobile-nav-btn-content">
+                  <Activity size={18} />
+                  <span>Overview & Telemetry</span>
+                </div>
+                <ChevronRight size={16} className="mobile-nav-arrow" />
+              </button>
 
-            <button 
-              type="button"
-              className={`nav-tab-btn ${activeTab === 'chatbot' ? 'active' : ''}`}
-              onClick={() => handleTabClick('chatbot')}
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '12px 16px' }}
-            >
-              <MessageSquare size={18} aria-hidden="true" />
-              <span>Coastal Chatbot (Live AI)</span>
-            </button>
-            
-            <button 
-              type="button"
-              className={`nav-tab-btn ${activeTab === 'developer' ? 'active' : ''}`}
-              onClick={() => handleTabClick('developer')}
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '12px 16px' }}
-            >
-              <Key size={18} aria-hidden="true" />
-              <span>Developer Portal & API Keys</span>
-            </button>
+              <button 
+                type="button"
+                className={`mobile-nav-btn ${activeTab === 'chatbot' ? 'active' : ''}`}
+                onClick={() => handleTabClick('chatbot')}
+              >
+                <div className="mobile-nav-btn-content">
+                  <MessageSquare size={18} />
+                  <span>Coastal Chatbot</span>
+                </div>
+                <span className="badge badge-accent" style={{ fontSize: '0.7rem' }}>AI</span>
+              </button>
+              
+              <button 
+                type="button"
+                className={`mobile-nav-btn ${activeTab === 'developer' ? 'active' : ''}`}
+                onClick={() => handleTabClick('developer')}
+              >
+                <div className="mobile-nav-btn-content">
+                  <Key size={18} />
+                  <span>Developer Portal</span>
+                </div>
+                {user && (
+                  <span className="nav-tab-badge">
+                    {user.api_keys?.length || 0} keys
+                  </span>
+                )}
+              </button>
 
-            <button 
-              type="button"
-              className={`nav-tab-btn ${activeTab === 'health' ? 'active' : ''}`}
-              onClick={() => handleTabClick('health')}
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '12px 16px' }}
-            >
-              <ShieldCheck size={18} aria-hidden="true" />
-              <span>Upstream Health (7 Providers)</span>
-            </button>
+              <button 
+                type="button"
+                className={`mobile-nav-btn ${activeTab === 'health' ? 'active' : ''}`}
+                onClick={() => handleTabClick('health')}
+              >
+                <div className="mobile-nav-btn-content">
+                  <ShieldCheck size={18} />
+                  <span>Upstream Health</span>
+                </div>
+                <span className="nav-tab-badge nav-tab-badge-live">
+                  7 Live
+                </span>
+              </button>
 
-            <a 
-              href="/docs" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="nav-tab-btn"
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '12px 16px', color: 'var(--text-secondary)' }}
-            >
-              <ExternalLink size={18} aria-hidden="true" />
-              <span>FastAPI Interactive Docs</span>
-            </a>
+              <a 
+                href="/docs" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="mobile-nav-btn"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <div className="mobile-nav-btn-content">
+                  <ExternalLink size={18} />
+                  <span>FastAPI Swagger Docs</span>
+                </div>
+                <ChevronRight size={16} className="mobile-nav-arrow" />
+              </a>
+            </div>
+
+            {/* Mobile User Profile Section */}
+            <div className="mobile-user-section">
+              {user ? (
+                <div className="mobile-user-card">
+                  <div className="mobile-user-info">
+                    <div className="mobile-user-avatar">
+                      {(user.username || user.name || 'D')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="mobile-user-name">{user.username || user.name}</div>
+                      <div className="mobile-user-meta">
+                        {user.api_keys?.length || 0} active API {user.api_keys?.length === 1 ? 'key' : 'keys'}
+                      </div>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      onLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="btn-mobile-signout"
+                  >
+                    <LogOut size={15} />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  type="button"
+                  className="btn-mobile-login"
+                  onClick={() => handleTabClick('developer')}
+                >
+                  <User size={16} />
+                  <span>Developer Sign In & API Keys</span>
+                </button>
+              )}
+            </div>
           </nav>
         )}
       </header>

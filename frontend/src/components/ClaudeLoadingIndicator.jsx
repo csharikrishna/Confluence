@@ -15,9 +15,17 @@ const STATUS_PHRASES = [
   "Auditing small-craft safety...",
   "Querying tidal models...",
   "Filtering sensor noise...",
+  "Harmonizing wind velocity...",
+  "Calibrating dew point...",
+  "Checking cyclone depression...",
+  "Sampling marine currents...",
+  "Parsing satellite radiance...",
+  "Assessing harbor chop...",
   "Verifying physical bounds...",
   "Grounding live telemetry...",
+  "Formulating safety thresholds...",
   "Synthesizing marine advisory...",
+  "Finalizing coastal guidance...",
 ];
 
 /**
@@ -34,7 +42,7 @@ export default function ClaudeLoadingIndicator({ compact = false }) {
         setIndex((prev) => (prev + 1) % STATUS_PHRASES.length);
         setFade(true);
       }, 180);
-    }, 1400);
+    }, 1750);
 
     return () => clearInterval(timer);
   }, []);
@@ -73,8 +81,8 @@ export default function ClaudeLoadingIndicator({ compact = false }) {
         style={{
           display: 'inline-block',
           fontStyle: 'normal',
-          fontWeight: 500,
-          color: 'var(--text-primary)',
+          fontWeight: 600,
+          color: '#0F172A',
           opacity: fade ? 1 : 0,
           transform: fade ? 'translateY(0)' : 'translateY(-2px)',
           transition: 'opacity 0.2s ease, transform 0.2s ease',

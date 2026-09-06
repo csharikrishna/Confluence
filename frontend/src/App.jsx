@@ -121,8 +121,10 @@ export function App() {
         )}
       </main>
 
-      {/* Floating Action Button to launch drawer */}
-      <FloatingChatButton onClick={() => setIsChatOpen(true)} />
+      {/* Floating Action Button to launch drawer (only when not on full chatbot tab and drawer not open) */}
+      {activeTab !== 'chatbot' && !isChatOpen && (
+        <FloatingChatButton onClick={() => setIsChatOpen(true)} />
+      )}
 
       {/* Slide-out Grounded Assistant Drawer */}
       <ChatDrawer 
