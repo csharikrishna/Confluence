@@ -1,0 +1,19 @@
+VISAKHAPATNAM PORT & COROMANDEL NORTH COASTAL PROFILE
+Document Reference: VPC-ENV-MON-2023-Q3
+Published Date: 2023-09-15
+Authority: Visakhapatnam Port Authority & Andhra Pradesh Pollution Control Board
+
+1. HARBOR HYDRODYNAMICS & NAUTICAL APPROACHES
+Visakhapatnam is a natural deep-water harbor on the east coast of India facing the Bay of Bengal.
+- Normal Non-Cyclonic Wave Conditions: Significant wave height (Hs) typically averages 0.8m to 1.3m outside the breakwater, with wave periods of 7.0s to 9.5s.
+- Tidal Range: Spring tidal range is approximately 1.55m; neap tide range is 0.52m. Tidal currents in the outer harbor channel range from 0.8 to 1.4 knots.
+- Sea Surface Temperature: Annual mean SST is 28.8°C, with summer peaks reaching 30.5°C in May and winter minimums of 26.2°C in January.
+
+2. BAY OF BENGAL METEOROLOGICAL & CYCLONIC CLIMATOLOGY
+- Cyclonic Disturbance Seasons: Pre-monsoon (April–May) and post-monsoon (October–December) are the primary seasons for deep depressions and severe cyclonic storms originating in the Andaman Sea.
+- Historical Pressure Minimums: Severe cyclonic storms in this region record central pressures dropping below 985 hPa, accompanied by storm surges of 2.0m to 3.5m above astronomical tide.
+- Prevailing Surface Winds: Southwest winds predominate during June–September (average 18 to 28 km/h); Northeast winds dominate during November–January (average 12 to 22 km/h).
+
+3. REGIONAL AIR QUALITY & INDUSTRIAL SHORELINE CONTEXT
+- Industrial Particulate Baselines: Annual ambient PM2.5 in the port and industrial belt historically averages 48.0 µg/m³; PM10 averages 88.0 µg/m³.
+- Stagnation Episodes: Occasional calm atmospheric conditions in November–December lead to localized particulate accumulation near coal and mineral cargo handling berths.

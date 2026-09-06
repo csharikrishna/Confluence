@@ -1,0 +1,6 @@
+# Optional dependencies for running the offline RAG vs Confluence benchmark study
+# (scripts/run_rag_benchmark.py and scripts/rag_engine.py).
+# Kept separate from requirements.txt to avoid large PyTorch wheel downloads
+# and memory constraints on free-tier hosting platforms (e.g. Render 512MB RAM).
+sentence-transformers>=2.2.0
+scikit-learn>=1.4.0

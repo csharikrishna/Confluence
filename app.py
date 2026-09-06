@@ -21,11 +21,13 @@ import asyncio
 import logging
 import requests
 import concurrent.futures
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
+from pydantic import BaseModel, Field
 from fastapi import FastAPI, Request, Query, HTTPException, status, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -39,6 +41,19 @@ from locations import get_all_locations
 from derived_insights import compute_derived_insights
 from rules_engine import evaluate_alerts
 from utils import get_path
+from chatbot import ask_coastal_assistant
+from auth import (
+    register_user,
+    authenticate_user,
+    verify_session_token,
+    generate_api_key,
+    list_user_api_keys,
+    revoke_api_key,
+    validate_api_key,
+    get_user_by_id,
+    init_auth_db,
+)
+from upstream_health import check_all_upstream_health
 
 # Reconfigure console encoding for Windows UTF-8 support
 if sys.stdout.encoding != "utf-8":
@@ -54,18 +69,57 @@ logging.basicConfig(
 )
 logger = logging.getLogger("environmental_api")
 
-# Rate Limiter: 30 requests/minute per client IP
-limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
+def get_rate_limit_key(request: Request) -> str:
+    """
+    Tiered Rate Limiter Key Function:
+    - If valid Confluence API Key (X-API-Key or ?api_key=) is present: bucket by API key hash.
+    - If valid Bearer session token is present: bucket by user ID.
+    - Otherwise: bucket by client IP address.
+    """
+    api_key = request.headers.get("x-api-key") or request.query_params.get("api_key")
+    if api_key and isinstance(api_key, str) and api_key.startswith("conf_live_"):
+        key_record = validate_api_key(api_key)
+        if key_record:
+            return f"apikey:{key_record.get('key_id', api_key[:16])}"
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+        payload = verify_session_token(token)
+        if payload and payload.get("uid"):
+            return f"user:{payload['uid']}"
+    return f"ip:{get_remote_address(request)}"
+
+
+def get_environment_rate_limit(key: str) -> str:
+    """
+    Dynamic Tiered Rate Limit Provider for GET /environment:
+    - Authenticated developers (API key or session): 100 requests / minute
+    - Anonymous public visitors: 30 requests / minute
+    """
+    if key.startswith("apikey:") or key.startswith("user:"):
+        return "100/minute"
+    return "30/minute"
+
+
+# Rate Limiter: Tiered rate limiting (30/min anonymous, 100/min authenticated)
+limiter = Limiter(key_func=get_rate_limit_key, default_limits=["60/minute"])
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 0. Phase 2A: initialize the SQLite history store (creates tables + prunes stale rows)
+    # 0. Phase 2A/3: initialize database stores and unique constraints
     try:
         storage.init_db()
         logger.info(f"History store initialized at {storage.DB_PATH}")
     except Exception as e:
         logger.warning(f"History store initialization failed: {e}")
+
+    try:
+        init_auth_db()
+        logger.info("Auth store and unique constraints initialized.")
+    except Exception as e:
+        logger.warning(f"Auth store initialization failed: {e}")
 
     # 1. Startup: Pre-warm station metadata and snapshot cache for every registered
     #    location (Phase 2B — no longer hardcoded to Chennai alone).
@@ -152,7 +206,7 @@ def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         content={
             "error": "TooManyRequests",
-            "message": "Rate limit exceeded (30 requests/minute). Please slow down.",
+            "message": f"Rate limit exceeded ({exc.detail}). Please slow down.",
             "detail": str(exc.detail),
         },
     )
@@ -186,27 +240,91 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-# Enable CORS for frontend integrations. This is a public, stateless, read-only API
-# with no cookies/sessions — allow_credentials stays False so allow_origins="*" means
-# what it says, rather than Starlette silently reflecting the caller's Origin header
-# (which is what happens when credentials=True is combined with a wildcard origin).
+# Allowed CORS origins: Locked down to explicit trusted frontend origins
+# (Local dev, Vite/React preview, production domain, and CONFLUENCE_ALLOWED_ORIGINS override)
+# to prevent credential and API key leakage under cross-origin attack surfaces.
+allowed_origins_env = os.getenv("CONFLUENCE_ALLOWED_ORIGINS")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    app_url = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("APP_URL")
+    if app_url:
+        clean_url = app_url.rstrip("/")
+        if clean_url not in allowed_origins:
+            allowed_origins.append(clean_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
 )
 
+# Mount static directory for images, assets, and styles
+_static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+if os.path.exists(_static_dir):
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+# Mount compiled React frontend assets if present
+_frontend_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
+_frontend_assets = os.path.join(_frontend_dist, "assets")
+if os.path.exists(_frontend_assets):
+    app.mount("/assets", StaticFiles(directory=_frontend_assets), name="assets")
+
+
+@app.get("/hero_coastal_monitoring.jpg", include_in_schema=False)
+def hero_image():
+    hero_path = os.path.join(_static_dir, "hero_coastal_monitoring.jpg")
+    if os.path.exists(hero_path):
+        return FileResponse(hero_path, media_type="image/jpeg")
+    return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/rag_vs_confluence_results.json", include_in_schema=False)
+def benchmark_results():
+    json_path = os.path.join(_static_dir, "rag_vs_confluence_results.json")
+    if os.path.exists(json_path):
+        return FileResponse(json_path, media_type="application/json")
+    return Response(status_code=status.HTTP_404_NOT_FOUND)
+
 
 @app.get("/", tags=["Info"])
-def root():
+def root(request: Request):
+    accept = request.headers.get("accept", "")
+    # Serve product landing page for browser requests expecting HTML
+    if "text/html" in accept and "application/json" not in accept:
+        # Check compiled React frontend first
+        react_html_path = os.path.join(_frontend_dist, "index.html")
+        if os.path.exists(react_html_path):
+            with open(react_html_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read(), status_code=status.HTTP_200_OK)
+        # Fallback to static/index.html
+        chat_html_path = os.path.join(_static_dir, "index.html")
+        if os.path.exists(chat_html_path):
+            with open(chat_html_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read(), status_code=status.HTTP_200_OK)
+
     return {
         "service": "Unified Environmental Intelligence API",
         "version": "2.0.0",
         "documentation": "/docs",
         "openapi": "/openapi.json",
         "sample_query": "/environment?lat=13.08&lon=80.27&name=Chennai%20Coast",
+        "chat_ui": "/chat",
         "features": [
             "Concurrent multi-source fetching (ThreadPoolExecutor)",
             "Multi-tier caching (24h station metadata, 5m snapshot cache)",
@@ -218,6 +336,7 @@ def root():
             "Physics-informed derived insights (heat index, sea state, storm potential, ...)",
             "Config-driven rule-based alerting (GET /alerts)",
             "Optional Slack/Discord alert webhook (ALERT_WEBHOOK_URL)",
+            "Phase 3 Grounded LLM Chatbot (/ask, /chat)",
         ],
         "hyperparameters_count": "50+ physical variables",
         "sources": [
@@ -230,7 +349,7 @@ def root():
             "NASA POWER (climatological solar & weather baseline)",
             "USGS Earthquake Hazards (7-day seismic & tsunami alert)",
         ],
-        "endpoints": ["/environment", "/environment/history", "/locations", "/alerts", "/health", "/docs"],
+        "endpoints": ["/environment", "/environment/history", "/locations", "/alerts", "/ask", "/chat", "/health", "/docs"],
     }
 
 
@@ -285,7 +404,7 @@ def _persist_and_log(lat, lon, name, snapshot, alerts):
     summary="Get unified environmental snapshot",
     description="Fetches live multi-domain environmental context for any lat/lon coordinates with concurrency, caching, and validation.",
 )
-@limiter.limit("30/minute")
+@limiter.limit(get_environment_rate_limit)
 def get_environment(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -538,6 +657,260 @@ def get_alerts(
         "active_alert_count": len(results),
         "active_alerts": results,
     }
+
+
+class AskRequest(BaseModel):
+    question: str = Field(..., description="Plain-language user question")
+    bypass_cache: Optional[bool] = Field(False, description="Bypass the 5-minute snapshot cache to force a fresh fetch")
+    model: Optional[str] = Field(None, description="Optional override for the LLM model name")
+
+
+@app.post(
+    "/ask",
+    tags=["Chatbot & Grounded Intelligence"],
+    summary="Ask plain-language question grounded in real-time coastal telemetry",
+    description=(
+        "Takes a plain-language question, resolves it to one of the 5 registered coastal locations, "
+        "fetches live multi-domain conditions and active alerts, hands the unified data to an LLM as strict "
+        "grounding context, and returns the synthesized answer alongside the raw grounding data."
+    ),
+)
+@limiter.limit("20/minute")
+def ask_question(request: Request, body: AskRequest, background_tasks: BackgroundTasks):
+    question = (body.question or "").strip()
+    if not question:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Invalid question", "message": "Question string cannot be empty"},
+        )
+
+    res = ask_coastal_assistant(question, bypass_cache=body.bypass_cache, model=body.model)
+    if res.get("location_matched") and res.get("grounding_data"):
+        snapshot = res["grounding_data"]
+        alerts = res.get("active_alerts", [])
+        coords = res.get("coordinates") or {}
+        lat, lon = coords.get("lat"), coords.get("lon")
+        name = res["location_matched"]
+        if lat is not None and lon is not None and not (snapshot.get("meta") or {}).get("cache_hit"):
+            background_tasks.add_task(_persist_and_log, lat, lon, name, snapshot, alerts)
+    return res
+
+
+@app.get(
+    "/chat",
+    response_class=HTMLResponse,
+    tags=["Interface"],
+    summary="Web client interface for the coastal chatbot",
+    description="Serves the single-page HTML client for querying the grounded assistant.",
+)
+def chat_ui():
+    chat_html_path = os.path.join(_static_dir, "index.html")
+    if os.path.exists(chat_html_path):
+        with open(chat_html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), status_code=status.HTTP_200_OK)
+    return HTMLResponse("<h3>Confluence Grounded AI</h3>", status_code=status.HTTP_200_OK)
+
+
+# =============================================================================
+# Developer Portal & Authentication Endpoints
+# =============================================================================
+class RegisterBody(BaseModel):
+    email: str = Field(..., description="Developer account email")
+    username: Optional[str] = Field(None, description="Username")
+    name: Optional[str] = Field(None, description="User or organization name")
+    password: str = Field(..., min_length=6, description="Account password (min 6 chars)")
+
+
+class LoginBody(BaseModel):
+    email: Optional[str] = Field(None, description="Account email")
+    username_or_email: Optional[str] = Field(None, description="Username or email")
+    password: str = Field(..., description="Account password")
+
+
+class CreateKeyBody(BaseModel):
+    key_name: Optional[str] = Field("Default API Key", description="Key name / label")
+    label: Optional[str] = Field(None, description="Key label / description")
+
+
+def _get_auth_user(request: Request) -> Dict[str, Any]:
+    auth_header = request.headers.get("Authorization", "")
+    token = ""
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+    elif auth_header:
+        token = auth_header.strip()
+
+    payload = verify_session_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "Unauthorized", "message": "Valid session token is required."},
+        )
+    user = get_user_by_id(payload["uid"])
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "Unauthorized", "message": "User account not found."},
+        )
+    return user
+
+
+@app.post(
+    "/api/auth/register",
+    status_code=status.HTTP_201_CREATED,
+    tags=["Developer Portal & Auth"],
+    summary="Register a new developer account",
+)
+@limiter.limit("5/minute")
+def api_register(request: Request, body: RegisterBody):
+    from auth import create_session_token
+    display_name = body.name or body.username or body.email.split("@")[0]
+    user, err = register_user(body.email, display_name, body.password)
+    if err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"error": "RegistrationFailed", "message": err})
+    token = create_session_token(user["id"], user["email"])
+    
+    initial_key = user.get("initial_api_key")
+    raw_key = initial_key[0] if isinstance(initial_key, (tuple, list)) else (initial_key.get("raw_key", "") if isinstance(initial_key, dict) else str(initial_key or ""))
+    key_record = initial_key[1] if isinstance(initial_key, (tuple, list)) and len(initial_key) > 1 else (initial_key if isinstance(initial_key, dict) else {})
+
+    key_item = {
+        "key_id": key_record.get("id", ""),
+        "key_name": key_record.get("label", "Default Starter Key"),
+        "key_prefix": key_record.get("key_prefix", ""),
+        "status": "active",
+        "is_active": True,
+        "created_at": key_record.get("created_at", ""),
+        "last_used_at": None,
+    }
+
+    return {
+        "status": "success",
+        "session_token": token,
+        "token": token,
+        "raw_key": raw_key,
+        "initial_api_key": {
+            "raw_key": raw_key,
+            "key_prefix": key_record.get("key_prefix", ""),
+        },
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "username": user["name"],
+            "token": token,
+            "api_keys": [key_item],
+        },
+    }
+
+
+@app.post(
+    "/api/auth/login",
+    tags=["Developer Portal & Auth"],
+    summary="Authenticate developer and retrieve session token",
+)
+@limiter.limit("5/minute")
+def api_login(request: Request, body: LoginBody):
+    login_id = body.email or body.username_or_email
+    if not login_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"error": "InvalidInput", "message": "Email is required."})
+    user, err = authenticate_user(login_id, body.password)
+    if err:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail={"error": "AuthenticationFailed", "message": err})
+    token = user.get("token")
+
+    raw_keys = list_user_api_keys(user["id"])
+    keys = []
+    for k in raw_keys:
+        item = dict(k)
+        item["key_id"] = item.get("id", item.get("key_id", ""))
+        item["key_name"] = item.get("label", item.get("key_name", "API Key"))
+        keys.append(item)
+
+    return {
+        "status": "success",
+        "session_token": token,
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "username": user["name"],
+            "token": token,
+            "api_keys": keys,
+        },
+    }
+
+
+@app.get(
+    "/api/auth/me",
+    tags=["Developer Portal & Auth"],
+    summary="Get current user details and active API keys",
+)
+def api_me(request: Request):
+    user = _get_auth_user(request)
+    raw_keys = list_user_api_keys(user["id"])
+    keys = []
+    for k in raw_keys:
+        item = dict(k)
+        item["key_id"] = item.get("id", item.get("key_id", ""))
+        item["key_name"] = item.get("label", item.get("key_name", "API Key"))
+        keys.append(item)
+
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user.get("name", ""),
+        "username": user.get("name", user["email"].split("@")[0]),
+        "user": user,
+        "api_keys": keys,
+    }
+
+
+@app.post(
+    "/api/auth/keys",
+    status_code=status.HTTP_201_CREATED,
+    tags=["Developer Portal & Auth"],
+    summary="Generate a new Confluence API Key (conf_live_...)",
+)
+def api_create_key(request: Request, body: CreateKeyBody):
+    user = _get_auth_user(request)
+    key_label = body.key_name or body.label or "Default API Key"
+    raw_key, record = generate_api_key(user["id"], label=key_label)
+    return {
+        "status": "success",
+        "raw_key": raw_key,
+        "key_id": record["id"],
+        "api_key": raw_key,
+        "record": record,
+    }
+
+
+@app.delete(
+    "/api/auth/keys/{key_id}",
+    tags=["Developer Portal & Auth"],
+    summary="Revoke an active API key",
+)
+def api_revoke_key(request: Request, key_id: str):
+    user = _get_auth_user(request)
+    success = revoke_api_key(user["id"], key_id)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error": "NotFound", "message": "Key not found or already revoked."})
+    return {"status": "success", "revoked": True, "message": f"API key {key_id} has been revoked."}
+
+
+
+# =============================================================================
+# Upstream Telemetry Health Endpoint
+# =============================================================================
+@app.get(
+    "/api/health/upstream",
+    tags=["Health & Telemetry"],
+    summary="Real-time latency and status monitor for all 7 upstream providers",
+)
+def api_upstream_health():
+    return check_all_upstream_health()
+
 
 
 if __name__ == "__main__":

@@ -1,0 +1,21 @@
+IMD REGIONAL METEOROLOGICAL CENTRE — CHENNAI COASTAL CLIMATE NORMALS
+Document Reference: IMD-RMC-CHN-CLIM-2023
+Published Date: 2023-04-15
+Authority: India Meteorological Department, Ministry of Earth Sciences, Government of India
+Location: Chennai Coastal Zone (Nungambakkam & Meenambakkam Observatories, 13.08° N, 80.27° E)
+
+1. CLIMATOLOGICAL SUMMARY & SEASONAL NORMALS
+Chennai experiences a tropical wet and dry climate with high relative humidity throughout the year (average 65% to 80%). 
+- Winter (January–February): Mean maximum temperature 29.3°C, mean minimum 20.8°C. Relative humidity averages 72%. Winds are predominantly northeasterly at 8–12 km/h. Sea state is typically slight with average significant wave heights between 0.6m and 0.9m.
+- Summer (March–May): Mean maximum temperature rises to 37.4°C in May, with extreme historical peaks reaching 42.8°C. High humidity produces apparent temperatures (heat index) regularly exceeding 40.0°C. Winds are southeasterly at 12–16 km/h.
+- Southwest Monsoon (June–September): Chennai lies in the rain shadow of the Western Ghats; rainfall during this period averages 440 mm total. Maximum temperatures remain elevated at 35.0°C to 36.5°C.
+- Northeast Monsoon (October–December): Principal rainfall season providing ~800 mm (60% of annual rainfall). November is the wettest month with normal precipitation of 375 mm. Active cyclonic disturbances in the Bay of Bengal produce sustained wind speeds of 45–65 km/h and wave swells exceeding 2.5m.
+
+2. HISTORICAL EXTREMES & RECORDED BASELINES
+- Highest Recorded Maximum Temperature: 45.0°C (May 31, 2003)
+- Lowest Recorded Minimum Temperature: 13.9°C (December 11, 1895)
+- Heaviest 24-hour Rainfall: 452.4 mm (November 25, 1976); 345.0 mm (December 1, 2015)
+- Mean Barometric Pressure: 1008.5 hPa in January; 1002.1 hPa in June; cyclonic depressions regularly drop below 995.0 hPa.
+
+3. ARTISANAL FISHERIES ADVISORY BASELINES
+Traditional kattumarams and motorized fiberglass boats (FRP) operate safely when wave heights remain below 1.5 meters and wind speeds are under 15 knots (28 km/h). During non-monsoon months (February to April), morning sea conditions along Marina and Besant Nagar are generally favorable for nearshore artisanal gillnetting within 5 nautical miles.

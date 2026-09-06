@@ -1,0 +1,19 @@
+COCHIN PORT AUTHORITY & KERALA STATE POLLUTION CONTROL BOARD — ENVIRONMENTAL REPORT
+Document Reference: CPT-ENV-KOC-2023-V2
+Published Date: 2023-08-10
+Authority: Cochin Port Authority & KSPCB
+Location: Kochi Coast & Vembanad Estuarine System (9.93° N, 76.26° E)
+
+1. PHYSICAL OCEANOGRAPHY & SWELL DYNAMICS
+Kochi is situated on the southwest Malabar coastline, adjacent to the Arabian Sea and the Vembanad backwater estuary:
+- Swell Regimes: Exposed to long-period southern ocean swells propagating from the Southern Indian Ocean. Mean wave periods range from 8.5 to 11.5 seconds. Significant wave heights during fair-weather months (November to April) average 0.7m to 1.1m.
+- Monsoon Dynamics (June to August): Heavy rainfall (average 3,000 mm annually). Strong longshore littoral currents flow southward at 1.5 to 2.8 km/h. Sea state escalates to significant wave heights of 2.2m to 3.5m, requiring navigational channel depth monitoring and tug assistance for harbor entry.
+- Sea Surface Temperature: Averages 28.2°C to 30.0°C year-round, with minor cooling during intense monsoonal upwelling in July.
+
+2. AIR QUALITY & METEOROLOGICAL NORMALS
+- Ambient Temperatures: Moderate tropical maritime temperature range (annual mean max 31.8°C, annual mean min 23.5°C). Relative humidity is consistently high, typically 70% to 88%.
+- Air Quality Baseline: Due to regular sea-breeze ventilation and high precipitation scavenging, ambient PM2.5 levels in Kochi are historically among the cleanest of major Indian coastal cities, averaging 18.0 to 32.0 µg/m³ (AQI category: "Good" to "Satisfactory").
+- Seasonal Inversion Risk: Minimal air stagnation occurs; localized pollution spikes are confined to industrial areas (Eloor-Edayar) during pre-dawn calms in January.
+
+3. ARTISANAL NAVIGATION CRITERIA
+Traditional non-mechanized vallams and ring-seine boats operate from Munambam and Fort Kochi fishing harbors. Operating safety thresholds standardly define maximum permissible offshore wave heights at 1.4m and surface wind speeds below 18 knots (33 km/h).

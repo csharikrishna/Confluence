@@ -1,0 +1,17 @@
+CENTRAL POLLUTION CONTROL BOARD — NATIONAL AIR QUALITY MONITORING PROGRAMME
+Document Reference: CPCB-NAAQM-ANNUAL-2023
+Published Date: 2023-12-05
+Authority: Central Pollution Control Board, Ministry of Environment, Forest and Climate Change, New Delhi
+
+1. COASTAL AIR QUALITY CHARACTERISTICS & ANNUAL MEANS
+While inland northern Indian cities experience catastrophic winter particulate accumulation (PM2.5 > 250 µg/m³), coastal maritime zones benefit from diurnal land-sea breeze dynamics:
+- Chennai Coastal Stations (Royapuram, Alandur): Annual mean PM2.5 recorded at 38.6 µg/m³ (2022–2023 baseline). Typical summer reading: 22–35 µg/m³. Typical post-monsoon / winter reading: 50–75 µg/m³. Historical winter stagnant days rarely exceed 110 µg/m³.
+- Mumbai Coastal Stations (Colaba, Worli): Annual mean PM2.5 recorded at 58.2 µg/m³. Winter months (Dec–Feb) register episodes exceeding 150.0 µg/m³ when calm anticyclonic conditions arrest maritime ventilation.
+- Visakhapatnam & Kochi: Cleanest coastal baselines. Kochi averages 24.5 µg/m³ PM2.5; Visakhapatnam averages 41.2 µg/m³ with localized industrial elevation near the port and steel plant.
+
+2. HEALTH THRESHOLDS & REGULATORY ADVISORIES (EPA / CPCB)
+- 0 to 30 µg/m³ PM2.5: Good. Minimal impact.
+- 31 to 60 µg/m³ PM2.5: Satisfactory. Minor breathing discomfort to sensitive people.
+- 61 to 90 µg/m³ PM2.5: Moderate. Breathing discomfort to people with lungs, asthma, and heart diseases.
+- 91 to 120 µg/m³ PM2.5: Poor. Breathing discomfort to most people on prolonged exposure.
+- 121 to 250 µg/m³ PM2.5: Very Poor. Respiratory illness on prolonged exposure. N95 protective equipment mandated for outdoor laborers.

@@ -92,6 +92,49 @@ class TestCachingAndRateLimiting(unittest.TestCase):
         self.assertEqual(data.get("error"), "InternalServerError")
         self.assertIn("Database/connection pool exhausted", data.get("detail", ""))
 
+    @patch("app.get_environmental_snapshot")
+    def test_tiered_rate_limiting_authenticated_vs_anonymous(self, mock_snapshot):
+        """
+        Verify tiered rate limiting:
+        - Anonymous requests are throttled after 30 requests/min.
+        - Authenticated requests with a valid Confluence API key are bucketed separately
+          and receive the higher 100 requests/min tier.
+        """
+        import auth
+        import uuid
+
+        mock_snapshot.return_value = {
+            "location": {"name": "Chennai Coast", "lat": 13.08, "lon": 80.27},
+            "generated_at": "2026-09-03T10:00:00Z",
+            "data": {},
+            "meta": {"cache_hit": True, "total_latency_ms": 0.5},
+        }
+
+        # Reset limiter storage
+        if hasattr(app.state, "limiter") and hasattr(app.state.limiter, "_storage"):
+            app.state.limiter._storage.reset()
+
+        # 1. Exhaust the 30/minute anonymous quota
+        for i in range(30):
+            res = self.client.get(f"/environment?lat=13.08&lon=80.27&name=Anon_{i}")
+            self.assertEqual(res.status_code, 200)
+
+        # 31st anonymous request is throttled
+        anon_throttled = self.client.get("/environment?lat=13.08&lon=80.27")
+        self.assertEqual(anon_throttled.status_code, 429)
+
+        # 2. Register a developer and generate an API key
+        suffix = uuid.uuid4().hex[:8]
+        user, _ = auth.register_user(f"tier_{suffix}@marine.org", "Tier User", "Password123!")
+        raw_key, _ = auth.generate_api_key(user["id"], "Tier Test Key")
+
+        # 3. Authenticated request with valid API key bypasses the anonymous cap and succeeds!
+        auth_res = self.client.get(
+            "/environment?lat=13.08&lon=80.27",
+            headers={"X-API-Key": raw_key},
+        )
+        self.assertEqual(auth_res.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()

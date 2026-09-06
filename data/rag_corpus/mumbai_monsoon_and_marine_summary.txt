@@ -1,0 +1,21 @@
+MAHARASHTRA MARITIME BOARD & IMD REGIONAL CENTRE — MUMBAI COASTAL REPORT
+Document Reference: MMB-ENV-MUM-2024-Q1
+Published Date: 2024-01-20
+Authority: Maharashtra Maritime Board & India Meteorological Department
+Location: Mumbai Coastal Corridor (Colaba, Juhu, Bandra, 18.94° N, 72.84° E)
+
+1. ARABIAN SEA HYDRODYNAMICS & MONSOON REGIME
+The Mumbai coastline faces the Arabian Sea and experiences severe seasonal variations in sea state:
+- Southwest Monsoon (June to September): Delivers over 2,200 mm of precipitation. Sea state becomes rough to very rough, with significant wave heights regularly between 2.5m and 4.2m. Sustained winds blow from southwest at 25–45 km/h with gusts exceeding 65 km/h. Small craft advisory is standard operational policy throughout July and August. Mechanized fishing bans (trawler bans) are legally enforced from June 1 to July 31 annually to prevent vessel loss.
+- Post-Monsoon & Winter (October to February): Relatively calm sea conditions. Significant wave heights average 0.6m to 1.1m with wave periods of 6–8 seconds. Sea surface temperatures range between 26.5°C and 28.5°C. Light westerly to northwesterly breezes at 8–15 km/h.
+
+2. URBAN ATMOSPHERIC QUALITY & WINTER INVERSIONS
+Due to coastal thermal inversions and vehicular density, winter months (November to February) frequently exhibit severe air quality stagnation:
+- Historical Mean PM2.5 in Winter: 115 µg/m³ to 165 µg/m³ (AQI category: "Poor" to "Very Poor").
+- Low wind velocities (<5 km/h) trap industrial and road dust along South Mumbai and coastal suburbs.
+- Post-monsoon sea spray promotes hygroscopic aerosol growth, exacerbating haze and reducing coastal visibility below 3,000 meters.
+
+3. HISTORICAL EXTREME EVENTS
+- Extreme 24-Hour Precipitation: 944.2 mm (July 26, 2005)
+- Severe Cyclonic Storm Phyan (November 2009): Produced wave heights of 5.5m and gusts of 90 km/h along Colaba.
+- Cyclone Nisarga (June 2020): Landfall near Alibag with maximum sustained winds of 110 km/h.

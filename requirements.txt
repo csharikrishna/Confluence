@@ -6,3 +6,4 @@ slowapi~=0.1.10
 cachetools~=6.2.6
 pytest~=9.0.2
 httpx~=0.28.1
+argon2-cffi>=23.1.0

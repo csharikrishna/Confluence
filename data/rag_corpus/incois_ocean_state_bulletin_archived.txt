@@ -1,0 +1,17 @@
+INCOIS — INDIAN NATIONAL CENTRE FOR OCEAN INFORMATION SERVICES
+Document Reference: INCOIS-OSF-ANNUAL-SUMMARY-2024
+Published Date: 2024-02-18
+Authority: ESSO-INCOIS, Ministry of Earth Sciences, Hyderabad
+
+1. OPERATIONAL SWELL WARNING THRESHOLDS & SEA STATE CLASSIFICATION
+INCOIS provides standard operational ocean state forecasting and safety criteria for Indian territorial waters:
+- Calm Sea: Significant Wave Height (Hs) < 0.5 meters.
+- Smooth to Slight Sea: Hs 0.5m to 1.25 meters. Safe for all artisanal and small craft fishing operations.
+- Moderate Sea: Hs 1.25m to 2.5 meters. Artisanal craft advised to exercise caution; avoid distant offshore waters.
+- Rough Sea: Hs 2.5m to 4.0 meters. Small craft advisory triggered. Artisanal non-mechanized vessels strictly advised not to venture into sea.
+- Very Rough to High Sea: Hs > 4.0 meters. Marine gale warning; all coastal and offshore operations suspended.
+
+2. MONSOON AND CYCLONE HISTORICAL WAVE CLIMATOLOGY
+- Southwest Monsoon Peak (July): Average significant wave heights off the Maharashtra and Kerala coasts exceed 2.8m, with peak periods between 9.0s and 12.0s.
+- Northeast Monsoon Peak (November): Bay of Bengal cyclonic waves off Chennai and Visakhapatnam historically reach 3.0m to 5.2m during depression landfalls.
+- Tsunami Trigger Criteria: Near-coastal earthquakes with seismic magnitude Mw >= 6.5 and hypocentral depth < 70 km trigger automated ocean buoy alert verification.

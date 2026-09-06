@@ -75,6 +75,10 @@ def _db():
     return _get_client()[MONGODB_DB_NAME]
 
 
+_get_db = _db
+
+
+
 def _snapshots():
     return _db()["snapshots"]
 

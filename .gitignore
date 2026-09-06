@@ -17,3 +17,5 @@ model_comparison_two_families.json
 # Phase 2: local SQLite history store (ephemeral on free-tier hosting; not source)
 *.db
 *.db-journal
+mongodb@*
+*.npz
