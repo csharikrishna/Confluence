@@ -660,7 +660,9 @@ def get_alerts(
 
 
 class AskRequest(BaseModel):
-    question: str = Field(..., description="Plain-language user question")
+    question: Optional[str] = Field(None, description="Plain-language user question")
+    query: Optional[str] = Field(None, description="Query alias for question")
+    location_name: Optional[str] = Field(None, description="Optional target location override (e.g. 'Chennai Coast')")
     bypass_cache: Optional[bool] = Field(False, description="Bypass the 5-minute snapshot cache to force a fresh fetch")
     model: Optional[str] = Field(None, description="Optional override for the LLM model name")
 
@@ -677,14 +679,19 @@ class AskRequest(BaseModel):
 )
 @limiter.limit("20/minute")
 def ask_question(request: Request, body: AskRequest, background_tasks: BackgroundTasks):
-    question = (body.question or "").strip()
+    question = (body.question or body.query or "").strip()
     if not question:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Invalid question", "message": "Question string cannot be empty"},
+            detail={"error": "Invalid question", "message": "Question or query string cannot be empty"},
         )
 
-    res = ask_coastal_assistant(question, bypass_cache=body.bypass_cache, model=body.model)
+    # If location_name is specified and not in question, supply it for deterministic matching
+    query_for_assistant = question
+    if body.location_name and body.location_name.lower() not in question.lower():
+        query_for_assistant = f"{question} (Location: {body.location_name})"
+
+    res = ask_coastal_assistant(query_for_assistant, bypass_cache=body.bypass_cache, model=body.model)
     if res.get("location_matched") and res.get("grounding_data"):
         snapshot = res["grounding_data"]
         alerts = res.get("active_alerts", [])

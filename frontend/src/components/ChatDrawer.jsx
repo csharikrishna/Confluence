@@ -64,6 +64,7 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation })
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          question: textToSend,
           query: textToSend,
           location_name: selectedLoc,
         })
