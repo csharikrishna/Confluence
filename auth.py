@@ -23,6 +23,11 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
 import db_backend as storage
+import storage as sqlite_storage
+
+# Dedicated SQLite filesystem path for local tables & failover
+# (Avoids connecting SQLite to mongo_storage.DB_PATH which is a host string)
+_SQLITE_AUTH_DB_PATH = sqlite_storage.DB_PATH
 
 logger = logging.getLogger("environmental_api.auth")
 AUTH_SECRET = os.getenv("CONFLUENCE_AUTH_SECRET", "confluence_marine_intel_secret_key_2026")
@@ -95,7 +100,7 @@ def init_auth_db():
             logger.warning(f"Mongo auth schema init failed ({e}); SQLite failover will be used.")
 
     # Always ensure SQLite tables exist so failover is instantaneous if Mongo drops
-    conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+    conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
     try:
         with conn:
             conn.execute(
@@ -286,7 +291,7 @@ def register_user(email: str, name: str, password: str) -> Tuple[Optional[Dict[s
             logger.warning(f"Mongo register_user failed ({e}), falling back to SQLite.")
 
     if not user_persisted:
-        conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+        conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
         try:
             with conn:
                 conn.execute(
@@ -338,7 +343,7 @@ def authenticate_user(email: str, password: str) -> Tuple[Optional[Dict[str, Any
             user = None
 
     if not user:
-        conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+        conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
         conn.row_factory = sqlite3.Row
         try:
             row = conn.execute("SELECT * FROM users WHERE email = ?", (email_clean,)).fetchone()
@@ -370,7 +375,7 @@ def authenticate_user(email: str, password: str) -> Tuple[Optional[Dict[str, Any
                 if db is not None:
                     db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": new_hash}})
             else:
-                conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+                conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
                 with conn:
                     conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user["id"]))
                 conn.close()
@@ -404,7 +409,7 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         except Exception as e:
             logger.warning(f"Mongo get_user_by_id failed ({e}), falling back to SQLite.")
 
-    conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+    conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     try:
         row = conn.execute("SELECT id, email, name, created_at FROM users WHERE id = ?", (clean_uid,)).fetchone()
@@ -462,7 +467,7 @@ def generate_api_key(user_id: str, label: str = "Default API Key") -> Tuple[str,
             logger.warning(f"Mongo generate_api_key failed ({e}), falling back to SQLite.")
 
     if not key_persisted:
-        conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+        conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
         try:
             with conn:
                 conn.execute(
@@ -504,7 +509,7 @@ def list_user_api_keys(user_id: str) -> List[Dict[str, Any]]:
         except Exception as e:
             logger.warning(f"Mongo list_user_api_keys failed ({e}), falling back to SQLite.")
 
-    conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+    conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(
@@ -539,7 +544,7 @@ def revoke_api_key(user_id: str, key_id: str) -> bool:
         except Exception as e:
             logger.warning(f"Mongo revoke_api_key failed ({e}), falling back to SQLite.")
 
-    conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+    conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
     try:
         with conn:
             cur = conn.execute("UPDATE api_keys SET is_active = 0 WHERE id = ? AND user_id = ?", (clean_kid, clean_uid))
@@ -583,7 +588,7 @@ def validate_api_key(raw_key: str) -> Optional[Dict[str, Any]]:
         except Exception as e:
             logger.warning(f"Mongo validate_api_key failed ({e}), falling back to SQLite.")
 
-    conn = sqlite3.connect(storage.DB_PATH, timeout=10)
+    conn = sqlite3.connect(_SQLITE_AUTH_DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     try:
         row = conn.execute(
