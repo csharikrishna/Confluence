@@ -19,6 +19,7 @@ Built to **ground frontier AI models** and maritime decision systems in empirica
 
 - [Live service](#live-service)
 - [Highlights](#highlights)
+- [AI Agent & MCP Integration (Claude & Cursor)](#ai-agent--mcp-integration-claude-desktop--cursor)
 - [Data sources](#data-sources)
 - [Why this matters](#why-this-matters)
 - [Quickstart](#quickstart)
@@ -51,6 +52,58 @@ Built to **ground frontier AI models** and maritime decision systems in empirica
 - **Production-hardened** — rate limiting, a global exception handler that never leaks stack traces, structured request logging, and a CI gate that runs the full test suite on every push.
 - **Physics-informed reasoning layer** — composite signals (heat index, sea state, storm potential, coastal flood risk, tsunami advisory) computed from cited meteorological/oceanographic standards, plus a config-driven alerting engine — see [Phase 2](#phase-2--history-trends--alerting).
 - **Pluggable, verified storage** — SQLite by default, with MongoDB Atlas as a drop-in durable backend, verified against a real running instance, not just mocks.
+- **Native Model Context Protocol (MCP)** — official `confluence-mcp` package for Claude Desktop and Cursor agent tool-use.
+
+---
+
+## AI Agent & MCP Integration (Claude Desktop & Cursor)
+
+Confluence provides an official **Model Context Protocol (MCP)** server ([`packages/confluence-mcp`](packages/confluence-mcp)) enabling Claude Desktop, Cursor, and enterprise AI agents to query live coastal sensor telemetry and physics derivations directly with a single configuration block:
+
+### Claude Desktop Configuration
+Add to `claude_desktop_config.json` (`%APPDATA%\Claude\claude_desktop_config.json` on Windows or `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "confluence": {
+      "command": "npx",
+      "args": ["-y", "confluence-mcp"],
+      "env": {
+        "CONFLUENCE_API_KEY": "conf_live_YOUR_API_KEY",
+        "CONFLUENCE_API_URL": "https://confluence-si41.onrender.com"
+      }
+    }
+  }
+}
+```
+
+### Cursor Configuration
+Add to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "confluence": {
+      "command": "npx",
+      "args": ["-y", "confluence-mcp"],
+      "env": {
+        "CONFLUENCE_API_KEY": "conf_live_YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### Exposed MCP Capabilities
+- **Tools**:
+  - `get_coastal_snapshot`: 7-in-1 real-time telemetry + NOAA Heat Index, WMO Beaufort force, small craft advisories, and storm surge.
+  - `get_preset_locations`: Validated coastal observatories (Chennai, Mumbai, Kochi, Visakhapatnam, Kolkata/Sundarbans).
+  - `check_coastal_alerts`: Threshold breaches, cyclone depressions, and hazard advisories.
+  - `get_historical_trends`: 24-hour physical deltas (temperature, pressure fall, wave height, wind).
+  - `ask_coastal_assistant`: Sensor-grounded natural language maritime guidance.
+- **Resources**: `confluence://locations` and `confluence://methodology`.
+- **Prompts**: `coastal-safety-audit` and `cyclone-readiness-check`.
 
 ---
 

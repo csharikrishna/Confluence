@@ -19,3 +19,8 @@ model_comparison_two_families.json
 *.db-journal
 mongodb@*
 *.npz
+
+# Node / Frontend / MCP
+node_modules/
+dist/
+.DS_Store

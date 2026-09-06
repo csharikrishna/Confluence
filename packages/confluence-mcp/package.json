@@ -1,0 +1,39 @@
+{
+  "name": "confluence-mcp",
+  "version": "1.0.0",
+  "description": "Model Context Protocol (MCP) Server for Confluence Coastal Environmental Intelligence Platform",
+  "type": "module",
+  "main": "src/server.js",
+  "bin": {
+    "confluence-mcp": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "anthropic",
+    "claude",
+    "environmental",
+    "marine",
+    "weather",
+    "ai-agent",
+    "oceanography"
+  ],
+  "author": "Confluence Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.24.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "test": "node tests/test_mcp_client.js"
+  }
+}
