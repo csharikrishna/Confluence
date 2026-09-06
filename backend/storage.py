@@ -20,7 +20,7 @@ from utils import get_path
 
 DB_PATH = os.getenv(
     "CONFLUENCE_DB_PATH",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "confluence_history.db"),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "confluence_history.db"),
 )
 
 # Fields surfaced in the lightweight meta.trend_24h diff (Phase 2A schema).

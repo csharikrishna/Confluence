@@ -16,6 +16,7 @@ import re
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from chatbot import call_nvidia_llm, build_grounding_prompt
 from scripts.rag_engine import rag_engine

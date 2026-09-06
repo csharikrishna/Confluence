@@ -20,6 +20,15 @@ remember to isolate storage correctly on its own.
 """
 
 import os
+import sys
+
+# Ensure backend and repo root are on sys.path for test runners
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_BACKEND_DIR = os.path.join(_REPO_ROOT, "backend")
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 os.environ["STORAGE_BACKEND"] = "sqlite"
 os.environ.pop("MONGODB_URI", None)
