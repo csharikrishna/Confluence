@@ -16,7 +16,9 @@ import {
   FileText, 
   MessageSquare,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  MapPin,
+  Sparkles
 } from 'lucide-react';
 import { ChatbotSection } from '../components/ChatbotSection';
 
@@ -238,221 +240,515 @@ export function OverviewView({ onNavigate, onOpenChat }) {
       {/* =========================================================================
            2. INTERACTIVE LIVE COASTAL STATION TELEMETRY
            ========================================================================= */}
-      <section id="telemetry" aria-label="Observation Registry" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div>
-          <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
-            Observation Registry
-          </span>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
-            Live Coastal Station Telemetry
-          </h2>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Inspect verified, real-time physical telemetry streams across India’s principal coastal corridors. Select any registered station to observe synchronized weather, hydrodynamics, air quality, and physics-informed composite risk metrics.
-          </p>
+      <section id="telemetry" aria-label="Observation Registry" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+        {/* Section Header */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary)', fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              <Radio size={13} aria-hidden="true" />
+              <span>Observation Registry</span>
+            </div>
+            <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.025em', margin: 0 }}>
+              Live Coastal Station Telemetry
+            </h2>
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '780px', lineHeight: 1.55 }}>
+              Synchronized multi-sensor telemetry across India’s core coastal corridors. Evaluated against active atmospheric, hydrodynamic, and particulate observation nodes.
+            </p>
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 14px',
+            background: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-full)',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            color: '#047857',
+            boxShadow: 'var(--shadow-sm)',
+            whiteSpace: 'nowrap',
+          }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#059669', animation: 'pulseGlow 1.4s ease-in-out infinite' }} />
+            <span>5 Stations Synchronized</span>
+          </div>
         </div>
 
-        {/* Station Switcher Tabs */}
+        {/* Station Switcher Segmented Control */}
         <div 
           role="tablist" 
           aria-label="Coastal Station Selector"
           style={{
             display: 'flex',
-            gap: '8px',
+            gap: '6px',
             overflowX: 'auto',
-            paddingBottom: '4px',
+            padding: '4px',
+            background: '#F1F5F9',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color)',
+            scrollbarWidth: 'none',
           }}
         >
-          {STATIONS.map((s) => (
-            <button
-              key={s.name}
-              type="button"
-              role="tab"
-              aria-selected={selectedStation.name === s.name}
-              onClick={() => setSelectedStation(s)}
-              style={{
-                padding: '10px 18px',
-                borderRadius: 'var(--radius-md)',
-                background: selectedStation.name === s.name ? 'var(--accent-primary)' : '#FFFFFF',
-                color: selectedStation.name === s.name ? '#FFFFFF' : 'var(--text-primary)',
-                border: '1px solid',
-                borderColor: selectedStation.name === s.name ? 'var(--accent-primary)' : 'var(--border-color)',
-                fontSize: '0.88rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                boxShadow: selectedStation.name === s.name ? 'var(--shadow-sm)' : 'none',
-                transition: 'background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease',
-              }}
-            >
-              {s.name}
-            </button>
-          ))}
+          {STATIONS.map((s) => {
+            const isSelected = selectedStation.name === s.name;
+            return (
+              <button
+                key={s.name}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                onClick={() => setSelectedStation(s)}
+                className={`station-tab-pill ${isSelected ? 'active' : ''}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 18px',
+                  borderRadius: '9px',
+                  background: isSelected ? '#FFFFFF' : 'transparent',
+                  color: isSelected ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  fontWeight: isSelected ? 700 : 500,
+                  fontSize: '0.85rem',
+                  border: isSelected ? '1px solid rgba(15, 23, 42, 0.08)' : '1px solid transparent',
+                  boxShadow: isSelected ? '0 1px 4px rgba(15, 23, 42, 0.08)' : 'none',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: isSelected ? 'var(--accent-primary)' : '#94A3B8',
+                  transition: 'background-color 0.15s ease',
+                }} />
+                <span>{s.name}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* 4 Telemetry Cards Grid */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '20px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '18px',
         }}>
           {/* Card 1: Ocean Hydrodynamics */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Waves size={18} style={{ color: '#0369A1' }} aria-hidden="true" />
-                <h3 style={{ fontWeight: 700, fontSize: '0.92rem' }}>Ocean Hydrodynamics</h3>
+          <div className="telemetry-card" style={{
+            background: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #F1F5F9' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: '#ECFEFF',
+                    color: '#0891B2',
+                    border: '1px solid #CFFAFE',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Waves size={18} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text-primary)', margin: 0 }}>
+                      Ocean Hydrodynamics
+                    </h3>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      Surface swell & currents
+                    </span>
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  background: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  whiteSpace: 'nowrap',
+                }}>
+                  Open-Meteo
+                </span>
               </div>
-              <span className="badge badge-neutral">Open-Meteo Marine</span>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Wave Height (Total)</span>
-                <span className="tabular-nums" style={{ fontWeight: 700 }}>
-                  {marine.wave_height_m !== undefined ? `${marine.wave_height_m} m` : '0.78 m'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Swell Wave Height</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {marine.swell_wave_height_m !== undefined ? `${marine.swell_wave_height_m} m` : '0.60 m'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Wave Period</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {marine.wave_period_s ? `${marine.wave_period_s} s` : '8.8 s'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Sea Surface Temp</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {marine.sea_surface_temperature_c ? `${marine.sea_surface_temperature_c} °C` : '30.6 °C'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Ocean Current</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {marine.ocean_current_velocity_kmh ? `${marine.ocean_current_velocity_kmh} km/h` : '1.1 km/h'}
-                </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Wave Height (Total)</span>
+                  <span className="tabular-nums" style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {marine.wave_height_m !== undefined ? marine.wave_height_m : '0.78'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>m</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Swell Wave Height</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {marine.swell_wave_height_m !== undefined ? marine.swell_wave_height_m : '0.60'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>m</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Wave Period</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {marine.wave_period_s ? marine.wave_period_s : '8.8'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>s</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Sea Surface Temp</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {marine.sea_surface_temperature_c ? marine.sea_surface_temperature_c : '30.6'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>°C</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Ocean Current</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {marine.ocean_current_velocity_kmh ? marine.ocean_current_velocity_kmh : '1.1'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>km/h</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Card 2: Atmosphere & Weather */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Thermometer size={18} style={{ color: '#B45309' }} aria-hidden="true" />
-                <h3 style={{ fontWeight: 700, fontSize: '0.92rem' }}>Atmosphere & Weather</h3>
+          <div className="telemetry-card" style={{
+            background: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #F1F5F9' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: '#FFFBEB',
+                    color: '#D97706',
+                    border: '1px solid #FEF3C7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Thermometer size={18} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text-primary)', margin: 0 }}>
+                      Atmosphere & Weather
+                    </h3>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      Surface met observations
+                    </span>
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  background: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  whiteSpace: 'nowrap',
+                }}>
+                  Open-Meteo
+                </span>
               </div>
-              <span className="badge badge-neutral">Open-Meteo Weather</span>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Air Temperature</span>
-                <span className="tabular-nums" style={{ fontWeight: 700 }}>
-                  {weather.temperature_c !== undefined ? `${weather.temperature_c} °C` : '31.5 °C'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Apparent Temp</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {weather.apparent_temperature_c ? `${weather.apparent_temperature_c} °C` : '36.0 °C'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Wind / Gusts</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {weather.wind_speed_kmh || 10.4} / {weather.wind_gusts_kmh || 32.8}&nbsp;km/h
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Relative Humidity</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {weather.relative_humidity_pct ? `${weather.relative_humidity_pct} %` : '64 %'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Surface Pressure</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {weather.surface_pressure_hpa ? `${weather.surface_pressure_hpa} hPa` : '1005.7 hPa'}
-                </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Air Temperature</span>
+                  <span className="tabular-nums" style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {weather.temperature_c !== undefined ? weather.temperature_c : '31.5'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>°C</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Apparent Temp</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {weather.apparent_temperature_c ? weather.apparent_temperature_c : '36.0'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>°C</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Wind / Gusts</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {weather.wind_speed_kmh || 10.4} / {weather.wind_gusts_kmh || 32.8}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>km/h</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Relative Humidity</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {weather.relative_humidity_pct ? weather.relative_humidity_pct : '64'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>%</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Surface Pressure</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {weather.surface_pressure_hpa ? weather.surface_pressure_hpa : '1005.7'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>hPa</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Card 3: Air Quality Sensor Array */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Activity size={18} style={{ color: '#475569' }} aria-hidden="true" />
-                <h3 style={{ fontWeight: 700, fontSize: '0.92rem' }}>Air Quality Array</h3>
+          <div className="telemetry-card" style={{
+            background: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #F1F5F9' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: '#ECFDF5',
+                    color: '#059669',
+                    border: '1px solid #D1FAE5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Activity size={18} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text-primary)', margin: 0 }}>
+                      Air Quality Array
+                    </h3>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      Ground particulate network
+                    </span>
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  background: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  whiteSpace: 'nowrap',
+                }}>
+                  OpenAQ / CPCB
+                </span>
               </div>
-              <span className="badge badge-neutral">OpenAQ Ground / CPCB</span>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>PM2.5 Concentration</span>
-                <span className="tabular-nums" style={{ fontWeight: 700 }}>
-                  {air.pm25 !== undefined ? `${air.pm25} µg/m³` : '23.8 µg/m³'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>PM10 Concentration</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>
-                  {air.pm10 !== undefined ? `${air.pm10} µg/m³` : '51.8 µg/m³'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>AQI Category</span>
-                <span className="badge badge-success">{air.category || 'Moderate'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Sensor Architecture</span>
-                <span style={{ fontWeight: 600 }}>Ground Sensor Array</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Station Name</span>
-                <span style={{ fontWeight: 600 }}>{air.station_name || 'Royapuram Station'}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>PM2.5 Concentration</span>
+                  <span className="tabular-nums" style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {air.pm25 !== undefined ? air.pm25 : '23.8'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>µg/m³</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>PM10 Concentration</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    {air.pm10 !== undefined ? air.pm10 : '51.8'}
+                    <span style={{ fontSize: '0.78em', fontWeight: 500, color: '#64748B', marginLeft: '3px' }}>µg/m³</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>AQI Risk Tier</span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: '#FFFBEB',
+                    color: '#B45309',
+                    border: '1px solid #FDE68A',
+                  }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#D97706' }} />
+                    {air.category || 'Moderate'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Sensor Network</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.84rem' }}>Ground In-Situ Array</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Station Node</span>
+                  <span 
+                    title={air.station_name || 'Royapuram Station'}
+                    style={{
+                      fontWeight: 600,
+                      color: '#0F172A',
+                      fontSize: '0.82rem',
+                      maxWidth: '150px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {air.station_name ? air.station_name.replace(/ - TNPCB| - KSPCB| - MPCB| - WBPCB| - APPCB/g, '').trim() : 'Royapuram, Chennai'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Card 4: Physics-Derived Marine Risk */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldAlert size={18} style={{ color: '#B91C1C' }} aria-hidden="true" />
-                <h3 style={{ fontWeight: 700, fontSize: '0.92rem' }}>Physics Derived Signals</h3>
-              </div>
-              <span className="badge badge-neutral">NOAA / IMD Derived</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>NOAA Heat Index</span>
-                <span className="badge badge-warning">
-                  {derived.heat_index_c ? `${derived.heat_index_c}°C (Caution)` : '34.9°C (Caution)'}
+          <div className="telemetry-card" style={{
+            background: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #F1F5F9' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: '#EEF2FF',
+                    color: '#4F46E5',
+                    border: '1px solid #E0E7FF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <ShieldAlert size={18} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text-primary)', margin: 0 }}>
+                      Physics Derived Signals
+                    </h3>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      Composite Risk Indices
+                    </span>
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  background: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  whiteSpace: 'nowrap',
+                }}>
+                  NOAA / IMD
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Small Craft Risk</span>
-                <span className="badge badge-success">Safe (None)</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>IMD Cyclone Band</span>
-                <span style={{ fontWeight: 600 }}>Normal</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Coastal Flood Risk</span>
-                <span style={{ fontWeight: 600 }}>Low</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>24h Pressure Trend</span>
-                <span className="tabular-nums" style={{ fontWeight: 600 }}>-0.4 hPa</span>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>NOAA Heat Index</span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: '#FFFBEB',
+                    color: '#B45309',
+                    border: '1px solid #FDE68A',
+                  }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#D97706' }} />
+                    {derived.heat_index_c ? `${derived.heat_index_c}°C (Caution)` : '34.9°C (Caution)'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Small Craft Risk</span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: '#ECFDF5',
+                    color: '#047857',
+                    border: '1px solid #A7F3D0',
+                  }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#059669' }} />
+                    Safe (None)
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>IMD Cyclone Band</span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: '#F1F5F9',
+                    color: '#334155',
+                    border: '1px solid #E2E8F0',
+                  }}>
+                    Normal
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Coastal Flood Risk</span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: '#F1F5F9',
+                    color: '#334155',
+                    border: '1px solid #E2E8F0',
+                  }}>
+                    Low Risk
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.84rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>24h Barometer Trend</span>
+                  <span className="tabular-nums" style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                    -0.4 hPa
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -460,32 +756,73 @@ export function OverviewView({ onNavigate, onOpenChat }) {
 
         {/* Station Detail Action Banner */}
         <div style={{
-          background: '#FFFFFF',
+          background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
           border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '18px 24px',
+          borderRadius: 'var(--radius-xl)',
+          padding: '20px 24px',
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '16px',
+          boxShadow: 'var(--shadow-sm)',
         }}>
-          <div>
-            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {selectedStation.name} Monitoring Station
-            </h4>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              Latitude {selectedStation.lat}°&nbsp;N, Longitude {selectedStation.lon}°&nbsp;E • {selectedStation.region}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: 'var(--accent-light)',
+              color: 'var(--accent-primary)',
+              border: '1px solid var(--accent-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <MapPin size={22} aria-hidden="true" />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  {selectedStation.name} Marine Observatory
+                </h4>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: '#047857',
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                }}>
+                  Active Observation Node
+                </span>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '3px', margin: 0 }}>
+                Coordinates: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedStation.lat}° N, {selectedStation.lon}° E</span> • {selectedStation.region}
+              </p>
+            </div>
           </div>
 
           <button 
             type="button"
             onClick={handleAskAboutStation}
             className="btn-primary"
-            style={{ fontSize: '0.85rem', padding: '10px 18px' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.86rem',
+              fontWeight: 600,
+              padding: '10px 20px',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 2px 8px rgba(8, 145, 178, 0.25)',
+              whiteSpace: 'nowrap',
+            }}
           >
-            <span>Ask AI Assistant About This Station</span>
+            <Sparkles size={16} aria-hidden="true" />
+            <span>Ask AI About This Station</span>
             <ArrowRight size={14} aria-hidden="true" />
           </button>
         </div>

@@ -1129,3 +1129,21 @@ button {
   border-radius: 0 8px 8px 0;
 }
 
+/* =============================================================================
+   TELEMETRY CARDS & STATION SELECTOR
+   ============================================================================= */
+.telemetry-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.telemetry-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.08), 0 2px 8px -1px rgba(8, 145, 178, 0.06);
+  border-color: #CBD5E1;
+}
+
+.station-tab-pill:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.8) !important;
+  color: var(--text-primary) !important;
+}
+
