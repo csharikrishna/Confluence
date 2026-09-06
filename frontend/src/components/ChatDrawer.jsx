@@ -10,6 +10,8 @@ import {
   CornerDownLeft,
   Loader2
 } from 'lucide-react';
+import MarkdownMessage from './MarkdownMessage.jsx';
+import ClaudeLoadingIndicator from './ClaudeLoadingIndicator.jsx';
 
 const SUGGESTIONS = [
   "Analyze current wave height and swell risk in Chennai",
@@ -240,9 +242,7 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation })
                 fontSize: '0.88rem',
                 lineHeight: '1.5',
               }}>
-                <div style={{ whiteSpace: 'pre-wrap' }}>
-                  {m.text}
-                </div>
+                <MarkdownMessage content={m.text} isUser={m.sender === 'user'} />
 
                 {m.sources && (
                   <div style={{
@@ -282,9 +282,8 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation })
           ))}
 
           {isLoading && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
-              <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
-              Executing live tool-calling across 7 providers...
+            <div style={{ alignSelf: 'flex-start', margin: '4px 0' }}>
+              <ClaudeLoadingIndicator compact={true} />
             </div>
           )}
           <div ref={messagesEndRef} />

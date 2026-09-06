@@ -10,6 +10,8 @@ import {
   ShieldCheck, 
   X 
 } from 'lucide-react';
+import MarkdownMessage from './MarkdownMessage.jsx';
+import ClaudeLoadingIndicator from './ClaudeLoadingIndicator.jsx';
 
 const SUGGESTIONS = [
   "Is it safe to fish near Chennai right now?",
@@ -287,9 +289,7 @@ export function ChatbotSection({ initialQuery = "" }) {
               fontSize: '0.92rem',
               lineHeight: '1.6',
             }}>
-              <div style={{ whiteSpace: 'pre-wrap' }}>
-                {m.text}
-              </div>
+              <MarkdownMessage content={m.text} isUser={m.sender === 'user'} />
 
               {m.locationMatched && (
                 <div style={{
@@ -347,23 +347,8 @@ export function ChatbotSection({ initialQuery = "" }) {
         ))}
 
         {isLoading && (
-          <div 
-            role="status"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '12px 16px',
-              background: '#FFFFFF',
-              border: '1px solid var(--border-color)',
-              borderRadius: '12px',
-              width: 'fit-content',
-              fontSize: '0.86rem',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
-            <span>Synthesizing live multi-source observations and evaluating safety rules…</span>
+          <div style={{ alignSelf: 'flex-start', margin: '6px 0' }}>
+            <ClaudeLoadingIndicator />
           </div>
         )}
         <div ref={messagesEndRef} />
