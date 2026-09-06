@@ -1,4 +1,4 @@
 # Optional extra — only needed if GDRIVE_ENABLED=true (see gdrive_backup.py).
 # Install with: pip install -r requirements.txt -r requirements-gdrive.txt
-google-api-python-client~=2.149.0
+google-api-python-client~=2.200.0
 google-auth~=2.35.0
