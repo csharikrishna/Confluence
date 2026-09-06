@@ -2,14 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Sparkles, Waves } from 'lucide-react';
 
 const STATUS_PHRASES = [
-  "Ingesting 7 live oceanic & weather feeds...",
-  "Collecting real-time wave buoy telemetry...",
-  "Merging surface pressure & satellite radiance...",
-  "Computing NOAA Heat Index & Magnus-Tetens dew point...",
-  "Evaluating WMO Beaufort sea-state & small craft risks...",
-  "Checking Bergeron pressure fall & inverse barometer surge...",
-  "Cross-validating physical sensor boundaries...",
-  "Synthesizing verified coastal guidance...",
+  "Contacting ocean buoys...",
+  "Ingesting weather feeds...",
+  "Reading wave telemetry...",
+  "Scanning sea-surface radar...",
+  "Merging sensor streams...",
+  "Tracking swell vectors...",
+  "Calculating heat stress...",
+  "Evaluating Beaufort force...",
+  "Checking storm surge risk...",
+  "Measuring pressure gradient...",
+  "Auditing small-craft safety...",
+  "Querying tidal models...",
+  "Filtering sensor noise...",
+  "Verifying physical bounds...",
+  "Grounding live telemetry...",
+  "Synthesizing marine advisory...",
 ];
 
 /**
@@ -25,8 +33,8 @@ export default function ClaudeLoadingIndicator({ compact = false }) {
       setTimeout(() => {
         setIndex((prev) => (prev + 1) % STATUS_PHRASES.length);
         setFade(true);
-      }, 200);
-    }, 1800);
+      }, 180);
+    }, 1400);
 
     return () => clearInterval(timer);
   }, []);
