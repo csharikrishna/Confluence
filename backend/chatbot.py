@@ -13,6 +13,7 @@ import json
 import time
 import logging
 import requests
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple, Dict, Any, List
 from dotenv import load_dotenv
 
@@ -290,24 +291,54 @@ def format_operational_briefing(snapshot: Dict[str, Any], alerts: List[Dict[str,
     return "\n".join(lines)
 
 
+def _get_ist_now() -> str:
+    """Returns current Indian Standard Time as a human-readable string for prompt injection."""
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(ist)
+    return now.strftime("%A, %d %b %Y, %I:%M %p IST")  # e.g. "Sunday, 07 Sep 2026, 04:32 PM IST"
+
+
 def build_grounding_prompt(question: str, snapshot: Dict[str, Any], alerts: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     """
-    Constructs the enhanced grounding prompt adhering to Phase 3 specification:
-    Provides both an explicit, human-and-model-readable Operational Coastal Briefing
-    (explaining what the 75 hyperparameters mean and their safety thresholds)
-    and the full raw technical JSON payload for verification.
+    Constructs the grounding prompt with:
+    - Current IST timestamp injected at the top so the model can reason about
+      time-relative queries ("in 3 hours", "tonight", "this evening").
+    - Operational coastal briefing (human-readable interpretation of all 75 parameters
+      with safety thresholds and domain context).
+    - Compact key-value summary of raw numeric values for model verification —
+      NOT the full JSON dump (reduces input tokens by ~40%).
+    - Indian coastal context baselines in the system instruction.
     """
     briefing_text = format_operational_briefing(snapshot, alerts)
+    current_ist = _get_ist_now()
 
-    context_payload = {
-        "location": snapshot.get("location"),
-        "timestamp_utc": snapshot.get("timestamp_utc"),
-        "environmental_data": snapshot.get("data"),
-        "derived_insights": (snapshot.get("meta") or {}).get("derived_insights"),
-        "trend_24h": (snapshot.get("meta") or {}).get("trend_24h"),
-        "active_alerts": alerts,
-    }
-    context_json = json.dumps(context_payload, indent=2, ensure_ascii=False)
+    # Compact key-value summary — avoids duplicating the full ~2000-token JSON
+    # while still giving the model raw numbers to reference
+    data = snapshot.get("data") or {}
+    meta = snapshot.get("meta") or {}
+    derived = meta.get("derived_insights") or {}
+    trend = meta.get("trend_24h") or {}
+    weather = data.get("weather") or {}
+    marine = data.get("marine") or {}
+    aq = data.get("air_quality") or {}
+    sun = data.get("sun_and_lighting") or {}
+
+    compact_values = (
+        f"[RAW KEY VALUES]\n"
+        f"temp={weather.get('temperature_c')}°C, feels_like={weather.get('apparent_temperature_c')}°C, "
+        f"humidity={weather.get('humidity_pct')}%, pressure={weather.get('surface_pressure_hpa') or weather.get('pressure_hpa')}hPa\n"
+        f"wind={weather.get('wind_speed_kmh')}km/h, gusts={weather.get('wind_gusts_kmh')}km/h, "
+        f"precip={weather.get('precipitation_mm')}mm, uv={weather.get('uv_index')}\n"
+        f"wave_height={marine.get('wave_height_m')}m, swell={marine.get('swell_wave_height_m')}m@{marine.get('swell_wave_period_s')}s, "
+        f"sst={marine.get('sea_surface_temp_c')}°C, current={marine.get('ocean_current_velocity_kmh')}km/h\n"
+        f"pm25={aq.get('pm25')}µg/m³, pm10={aq.get('pm10')}µg/m³, aqi_cat={aq.get('aqi_category')}\n"
+        f"heat_index={derived.get('heat_index_c')}°C ({derived.get('heat_index_category')}), "
+        f"beaufort={derived.get('beaufort_scale', {}).get('force')} ({derived.get('beaufort_scale', {}).get('name')})\n"
+        f"small_craft_risk={derived.get('small_craft_risk_level')}, storm_potential={derived.get('storm_potential_score')} ({derived.get('storm_potential_level')})\n"
+        f"sunrise={sun.get('sunrise_utc')}, sunset={sun.get('sunset_utc')}, "
+        f"pressure_24h_trend={trend.get('pressure_hpa', {}).get('diff')}hPa\n"
+        f"active_alerts_count={len(alerts)}"
+    )
 
     system_instruction = (
         "You are the Coastal Intelligence & Safety Advisor for Confluence.\n"
@@ -315,24 +346,38 @@ def build_grounding_prompt(question: str, snapshot: Dict[str, Any], alerts: List
         "Use ONLY the verified real-time data and operational briefing provided below to answer the user's question.\n\n"
         "COMMUNICATION PHILOSOPHY:\n"
         "1. Natural, Human-First Tone: The user will describe their situation naturally and will NOT ask you to 'be simple' or 'be technical'. "
-        "You must adapt naturally. Deliver a clear, empathetic, and direct answer in plain language first without overwhelming them.\n"
-        "2. Avoid Metric Clutter: Do NOT dump 75 raw numbers or unnecessary scientific jargon on a normal user. Abstract away background complexity.\n"
-        "3. Core Meaningful Metrics: Display ONLY the basic metrics that matter to everyday human safety:\n"
-        "   - Weather & Temperature (ambient temp + how it actually feels with humidity / heat index)\n"
-        "   - Wind Speed & Direction (and whether it creates chop, drift, or whitecaps)\n"
-        "   - Wave Height & Sea State (significant wave height and whether waves are safe for small craft or beachgoers)\n"
-        "   - Ocean Conditions (sea surface temperature, current drift)\n"
-        "   - Safety Alerts & Advisories (highlight dangerous heat, high surf, or squalls immediately unprompted)\n"
-        "4. PROACTIVE SAFETY ALERT: If there are any active alerts or dangerous marine/weather conditions (e.g. hazardous wave heights, gale winds, poor air quality, rapid pressure drop), highlight them prominently and immediately unprompted.\n"
-        "5. Scenario-Specific Guidance: Give clear, actionable advice addressing the user's specific scenario (e.g. timing family beach visits to avoid peak heat, equipment needed for small craft sailing).\n"
-        "6. Technical Depth On Demand: If deeper physical factors are relevant (such as pressure trends, river runoff, or satellite smoke attribution), summarize them cleanly at the end in an optional 'Detailed Marine Data' note rather than cluttering the main response.\n"
-        "7. Strict Grounding: Use ONLY the verified real-time data provided. Never guess or hallucinate."
+        "You must adapt naturally — be empathetic, direct, and conversational.\n"
+        "2. TIME-AWARE REASONING: The current local time (IST) is injected at the top of every briefing. Use it to:\n"
+        "   - Resolve relative time references: 'in 3 hours', 'tonight', 'this evening', 'at sunset'.\n"
+        "   - Check if the user's planned activity falls within daylight, after sunset, or during peak heat hours.\n"
+        "   - Reference the provided sunrise/sunset times to anchor advice precisely.\n"
+        "3. Avoid Metric Clutter: Do NOT dump raw numbers on a normal user. Abstract away complexity.\n"
+        "4. Core Meaningful Metrics: Surface ONLY the metrics that matter to everyday human safety:\n"
+        "   - Temperature (ambient + how it feels with heat index)\n"
+        "   - Wind speed (and what it means — chop, whitecaps, drift)\n"
+        "   - Wave height & sea state (safe for small craft or families?)\n"
+        "   - Safety alerts (highlight immediately, unprompted)\n"
+        "5. PROACTIVE SAFETY ALERT: Highlight any dangerous conditions (hazardous waves, gale winds, poor air, rapid pressure drop) prominently and immediately.\n"
+        "6. Scenario-Specific Guidance: Give clear, actionable advice for the user's specific scenario.\n"
+        "7. Technical Depth On Demand: Summarize deeper data cleanly at the end in an optional 'Detailed Data' note.\n"
+        "8. Strict Grounding: Use ONLY the verified real-time data provided. Never guess or hallucinate.\n\n"
+        "INDIAN COASTAL CONTEXT — apply these region-specific baselines (not generic Western standards):\n"
+        "- Temperature: Indian coastal cities routinely see 30–40°C. "
+        "Treat ≤35°C as normal for the season, 36–40°C as warm-but-typical, 41°C+ as elevated caution, 44°C+ as severe. "
+        "Do NOT alarm users for temperatures that are typical for this region and season.\n"
+        "- Humidity: Coastal India regularly sees 60–90% humidity, especially Jun–Sep (monsoon). "
+        "Flag humidity only when combined with high temperature to produce a dangerous heat index (>40°C).\n"
+        "- Wind: Bay of Bengal coasts regularly see 15–30 km/h monsoon winds. "
+        "Reference IMD (Indian Meteorological Department) standards — not generic Western thresholds.\n"
+        "- Monsoon context: If the date falls between June and September, acknowledge monsoon season when relevant "
+        "(higher baseline humidity, increased swell, elevated rainfall probability).\n"
+        "- Units: Always use Celsius for temperature, km/h for wind, meters for waves. Never switch to Fahrenheit or knots."
     )
 
     user_content = (
+        f"Current Local Time (IST): {current_ist}\n\n"
         f"{briefing_text}\n\n"
-        f"VERIFIED REAL-TIME COASTAL DATA & ALERTS:\n"
-        f"```json\n{context_json}\n```\n\n"
+        f"{compact_values}\n\n"
         f"User question: {question}"
     )
 
@@ -373,7 +418,7 @@ def call_nvidia_llm(
         payload = {
             "model": candidate_model,
             "messages": messages,
-            "max_tokens": 1024,
+            "max_tokens": 700,
             "temperature": 0.3,
             "top_p": 0.95,
         }

@@ -48,7 +48,7 @@ def is_gemini_available() -> bool:
 def convert_chat_messages_to_gemini_payload(
     messages: List[Dict[str, str]],
     temperature: float = 0.2,
-    max_output_tokens: int = 1500,
+    max_output_tokens: int = 900,
     top_p: float = 0.95,
 ) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
     """
@@ -105,7 +105,7 @@ def call_gemini_llm(
     model: Optional[str] = None,
     api_key: Optional[str] = None,
     temperature: float = 0.2,
-    max_tokens: int = 1500,
+    max_tokens: int = 900,
     timeout: int = 50,
     retries_per_model: int = 1,
 ) -> Tuple[str, str]:
