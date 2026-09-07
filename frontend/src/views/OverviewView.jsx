@@ -58,7 +58,8 @@ export function OverviewView({ onNavigate, onOpenChat }) {
 
   const weather = telemetry?.data?.weather || {};
   const marine = telemetry?.data?.marine || {};
-  const aq = telemetry?.data?.air_quality || {};
+  const air = telemetry?.data?.air_quality || {};
+  const aq = air;
   const derived = telemetry?.meta?.derived_insights || {};
   const alerts = telemetry?.meta?.active_alerts || [];
   const flood = telemetry?.data?.river_flood || {};
