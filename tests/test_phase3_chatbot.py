@@ -18,12 +18,14 @@ from chatbot import (
     build_grounding_prompt,
     ask_coastal_assistant,
     LOCATION_ALIASES,
+    CHATBOT_ANSWER_CACHE,
 )
 
 
 class TestPhase3Chatbot(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        CHATBOT_ANSWER_CACHE.clear()
 
     def test_location_matching_canonical_and_aliases(self):
         # Chennai
@@ -197,7 +199,39 @@ class TestPhase3Chatbot(unittest.TestCase):
         self.assertEqual(res["llm_provider"], "nvidia")
         self.assertTrue(mock_nvidia.called)
 
+    def test_post_ask_question_too_long(self):
+        long_q = "Is it safe in Chennai? " + ("word " * 120)
+        resp = self.client.post("/ask", json={"question": long_q})
+        self.assertEqual(resp.status_code, 422)
+        self.assertIn("string_too_long", str(resp.json()))
+
+    @patch("chatbot.call_gemini_llm")
+    @patch("chatbot.is_gemini_available", return_value=True)
+    @patch("chatbot.fetch_grounding_context")
+    def test_chatbot_answer_cache_hit(self, mock_fetch, mock_avail, mock_gemini):
+        mock_fetch.return_value = (
+            {
+                "location": {"name": "Chennai Coast", "lat": 13.08, "lon": 80.27},
+                "data": {"weather": {"temperature_c": 30.0}},
+                "meta": {},
+            },
+            [],
+        )
+        mock_gemini.return_value = ("Fresh Gemini Answer", "gemini-3.5-flash-lite")
+
+        # 1st call: Miss (calls Gemini)
+        r1 = ask_coastal_assistant("Can I visit Chennai Marina today?", provider="gemini")
+        self.assertFalse(r1["cache_hit"])
+        self.assertEqual(mock_gemini.call_count, 1)
+
+        # 2nd call with same query: Hit (returns cached result without invoking Gemini)
+        r2 = ask_coastal_assistant("can i visit chennai marina today?", provider="gemini")
+        self.assertTrue(r2["cache_hit"])
+        self.assertEqual(mock_gemini.call_count, 1)  # NOT incremented!
+        self.assertEqual(r2["answer"], "Fresh Gemini Answer")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

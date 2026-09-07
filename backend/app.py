@@ -108,6 +108,17 @@ def get_environment_rate_limit(key: str) -> str:
     return "30/minute"
 
 
+def get_ask_rate_limit(key: str) -> str:
+    """
+    Tiered Rate Limit Provider for POST /ask (protects LLM tokens & API budget):
+    - Authenticated developers (API key or session): 15 requests / minute
+    - Anonymous public visitors: 6 requests / minute
+    """
+    if key.startswith("apikey:") or key.startswith("user:"):
+        return "15/minute"
+    return "6/minute"
+
+
 # Rate Limiter: Tiered rate limiting (30/min anonymous, 100/min authenticated)
 limiter = Limiter(key_func=get_rate_limit_key, default_limits=["60/minute"])
 
@@ -721,12 +732,12 @@ def get_alerts(
 
 
 class AskRequest(BaseModel):
-    question: Optional[str] = Field(None, description="Plain-language user question")
-    query: Optional[str] = Field(None, description="Query alias for question")
-    location_name: Optional[str] = Field(None, description="Optional target location override (e.g. 'Chennai Coast')")
+    question: Optional[str] = Field(None, max_length=500, description="Plain-language user question (max 500 chars)")
+    query: Optional[str] = Field(None, max_length=500, description="Query alias for question (max 500 chars)")
+    location_name: Optional[str] = Field(None, max_length=100, description="Optional target location override (e.g. 'Chennai Coast')")
     bypass_cache: Optional[bool] = Field(False, description="Bypass the 5-minute snapshot cache to force a fresh fetch")
-    model: Optional[str] = Field(None, description="Optional override for the LLM model name")
-    provider: Optional[str] = Field(None, description="Optional LLM provider override ('gemini' or 'nvidia')")
+    model: Optional[str] = Field(None, max_length=100, description="Optional override for the LLM model name")
+    provider: Optional[str] = Field(None, max_length=50, description="Optional LLM provider override ('gemini' or 'nvidia')")
 
 
 @app.post(
@@ -739,13 +750,21 @@ class AskRequest(BaseModel):
         "grounding context, and returns the synthesized answer alongside the raw grounding data."
     ),
 )
-@limiter.limit("20/minute")
+@limiter.limit(get_ask_rate_limit)
 def ask_question(request: Request, body: AskRequest, background_tasks: BackgroundTasks):
     question = (body.question or body.query or "").strip()
     if not question:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": "Invalid question", "message": "Question or query string cannot be empty"},
+        )
+    if len(question) > 500:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "QuestionTooLong",
+                "message": "Question exceeds maximum allowed limit of 500 characters to prevent token exhaustion and API abuse.",
+            },
         )
 
     # If location_name is specified and not in question, supply it for deterministic matching

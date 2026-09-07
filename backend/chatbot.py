@@ -13,6 +13,7 @@ import json
 import time
 import logging
 import requests
+import cachetools
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple, Dict, Any, List
 from dotenv import load_dotenv
@@ -31,6 +32,19 @@ from gemini_client import (
 
 load_dotenv()
 logger = logging.getLogger("environmental_api.chatbot")
+
+# In-memory Answer Cache for grounded coastal assistant
+# Maps (canonical_location_name, normalized_question, provider, model) -> full assistant response dict
+# TTL = 300s (5 minutes) matches the environmental data snapshot TTL.
+# Eliminates redundant LLM calls for identical/repeated questions, drops latency to <1ms,
+# and prevents token exhaustion/costs from user spam or page refreshes.
+CHATBOT_ANSWER_CACHE = cachetools.TTLCache(maxsize=500, ttl=300)
+
+
+def normalize_query_for_cache(q: str) -> str:
+    """Normalizes query text (lowercase, punctuation stripped, single-spaced) for robust cache matching."""
+    q_clean = re.sub(r"[^\w\s]", "", (q or "").lower()).strip()
+    return re.sub(r"\s+", " ", q_clean)
 
 # ---------------------------------------------------------------------------
 # Registered Location Aliases
@@ -505,7 +519,17 @@ def ask_coastal_assistant(
             "llm_model": None,
         }
 
-    # Location matched — fetch live environmental intelligence
+    # Location matched — check answer cache first to eliminate redundant LLM costs
+    norm_q = normalize_query_for_cache(question)
+    cache_key = (loc["name"], norm_q, provider or "default", model or "default")
+
+    if not bypass_cache and cache_key in CHATBOT_ANSWER_CACHE:
+        logger.info(f"Chatbot answer cache HIT for location={loc['name']}")
+        cached_result = dict(CHATBOT_ANSWER_CACHE[cache_key])
+        cached_result["cache_hit"] = True
+        return cached_result
+
+    # Cache miss: fetch live environmental intelligence
     snapshot, alerts = fetch_grounding_context(
         lat=loc["lat"],
         lon=loc["lon"],
@@ -544,7 +568,7 @@ def ask_coastal_assistant(
         provider_used = "nvidia"
         model_used = model or os.getenv("NVIDIA_MODEL") or CANDIDATE_MODELS[0]
 
-    return {
+    result = {
         "question": question,
         "location_matched": loc["name"],
         "location_used": loc["name"],
@@ -554,4 +578,10 @@ def ask_coastal_assistant(
         "grounding_data": snapshot,
         "llm_provider": provider_used,
         "llm_model": model_used,
+        "cache_hit": False,
     }
+
+    if answer and not bypass_cache:
+        CHATBOT_ANSWER_CACHE[cache_key] = result
+
+    return result
