@@ -27,21 +27,24 @@ export function Footer({ onNavigate }) {
             Confluence Platform
           </div>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-            Production-grade coastal and oceanographic environmental intelligence. Synthesizing 50+ real-time hyperparameters from 7 upstream scientific providers with deterministic physics derivations.
+            Production-grade coastal and oceanographic environmental intelligence. Synthesizing 50+ real-time hyperparameters from 10 upstream scientific providers with deterministic physics derivations.
           </p>
         </div>
 
         {/* Col 2 */}
         <div>
           <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '12px' }}>
-            7 Upstream Providers
+            10 Upstream Providers
           </div>
           <ul style={{ listStyle: 'none', padding: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.8' }}>
             <li>• Open-Meteo Weather (Atmospheric array)</li>
             <li>• Open-Meteo Marine (Wave & hydrodynamic)</li>
+            <li>• Open-Meteo Flood (GloFAS river discharge)</li>
             <li>• OpenAQ Ground Array (Physical PM sensors)</li>
             <li>• USGS Seismic (Coastal earthquake & tsunami)</li>
             <li>• NASA POWER (Solar irradiance & radiation)</li>
+            <li>• GDACS Disaster Tracking (Tropical cyclones)</li>
+            <li>• NASA FIRMS (Satellite thermal fire anomalies)</li>
             <li>• Sunrise-Sunset Engine (Ephemeris)</li>
             <li>• Open-Elevation (Topography & bathymetry)</li>
           </ul>

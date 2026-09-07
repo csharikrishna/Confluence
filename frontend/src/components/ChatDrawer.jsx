@@ -26,7 +26,7 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation })
     {
       id: 'welcome',
       sender: 'assistant',
-      text: "👋 Welcome to **Confluence Grounded Intelligence**. I perform live deterministic tool-calling against active telemetry across our 7 upstream scientific providers. Ask me about coastal hazards, wave physics, or maritime safety.",
+      text: "👋 Welcome to **Confluence Grounded Intelligence**. I perform live deterministic tool-calling against active telemetry across our 10 upstream scientific providers. Ask me about coastal hazards, wave physics, or maritime safety.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
   ]);
@@ -164,7 +164,7 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation })
                   border: '1px solid #A7F3D0',
                 }}>
                   <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#059669' }} />
-                  7 Feeds Live
+                  10 Feeds Live
                 </span>
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>

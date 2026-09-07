@@ -191,8 +191,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Unified Environmental Intelligence API",
     description=(
-        "A single normalized API endpoint that pulls live data from 7 independent environmental sources "
-        "(weather, ocean/marine, air quality, astronomical, terrain, climate baseline, seismic) concurrently, "
+        "A single normalized API endpoint that pulls live data from 10 independent environmental sources "
+        "(weather, ocean/marine, air quality, astronomical, terrain, climate baseline, seismic, river discharge/flood, GDACS cyclone tracking, NASA FIRMS fire) concurrently, "
         "normalizes the units and schema, and serves it as a single JSON response for frontier AI models and "
         "coastal risk applications. Phase 2 adds persisted history/trends, a multi-location registry, and a "
         "physics-informed alerting layer on top of the raw Phase 1 hyperparameters."
@@ -347,12 +347,14 @@ def root(request: Request):
         "sources": [
             "Open-Meteo Weather (14 hyperparameters)",
             "Open-Meteo Marine (12 hydrodynamic hyperparameters)",
-            "OpenAQ Ground Stations (physical sensor array)",
-            "Open-Meteo Air Quality (atmospheric model fallback)",
+            "OpenAQ Ground Stations (physical sensor array with Open-Meteo atmospheric model fallback)",
+            "Open-Meteo Flood API (river discharge & estuarine flood forecasting)",
             "Sunrise-Sunset.org (solar & marine nautical ephemeris)",
             "Open-Meteo Elevation (topography & coastal flood vulnerability)",
             "NASA POWER (climatological solar & weather baseline)",
             "USGS Earthquake Hazards (7-day seismic & tsunami alert)",
+            "GDACS Tropical Cyclone Tracking (UN/EC JRC active cyclone trajectories, intensity & multi-hazard alert level)",
+            "NASA FIRMS (satellite active fire & thermal anomaly detection for PM2.5 causality)",
         ],
         "endpoints": ["/environment", "/environment/history", "/locations", "/alerts", "/ask", "/chat", "/health", "/docs"],
     }
@@ -918,7 +920,7 @@ def api_revoke_key(request: Request, key_id: str):
 @app.get(
     "/api/health/upstream",
     tags=["Health & Telemetry"],
-    summary="Real-time latency and status monitor for all 7 upstream providers",
+    summary="Real-time latency and status monitor for all 10 upstream providers",
 )
 def api_upstream_health():
     return check_all_upstream_health()

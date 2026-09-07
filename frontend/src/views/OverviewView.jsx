@@ -126,7 +126,7 @@ export function OverviewView({ onNavigate, onOpenChat }) {
               lineHeight: 1.6,
               marginBottom: '24px',
             }}>
-              Confluence concurrently aggregates and validates 50+ atmospheric, hydrodynamic, and terrestrial parameters across 7 verified public sources into real-time operational decision support. Grounded in empirical physical observations — not statistical hallucinations.
+              Confluence concurrently aggregates and validates 50+ atmospheric, hydrodynamic, and terrestrial parameters across 10 verified public sources into real-time operational decision support. Grounded in empirical physical observations — not statistical hallucinations.
             </p>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '32px' }}>
@@ -163,7 +163,7 @@ export function OverviewView({ onNavigate, onOpenChat }) {
               borderTop: '1px solid var(--border-color)',
             }}>
               <div>
-                <div className="tabular-nums" style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)' }}>7</div>
+                <div className="tabular-nums" style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)' }}>10</div>
                 <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Confluent Data Feeds</div>
               </div>
               <div>
@@ -231,7 +231,7 @@ export function OverviewView({ onNavigate, onOpenChat }) {
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-success)' }} aria-hidden="true" />
                 <strong>Marine Telemetry Network</strong>
               </div>
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>7 Verified Streams Active</span>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>10 Verified Streams Active</span>
             </div>
           </div>
         </div>
@@ -252,7 +252,7 @@ export function OverviewView({ onNavigate, onOpenChat }) {
               Live Coastal Station Telemetry
             </h2>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '780px', lineHeight: 1.55 }}>
-              Synchronized multi-sensor telemetry across India’s core coastal corridors. Evaluated against active atmospheric, hydrodynamic, and particulate observation nodes.
+              Synchronized multi-sensor telemetry across India’s South, West, and East coastal corridors (Chennai, Mumbai, Kochi, Visakhapatnam, Kolkata/Sundarbans). Evaluated against active atmospheric, hydrodynamic, and particulate observation nodes.
             </p>
           </div>
 
@@ -562,7 +562,7 @@ export function OverviewView({ onNavigate, onOpenChat }) {
                   borderRadius: '999px',
                   whiteSpace: 'nowrap',
                 }}>
-                  OpenAQ / CPCB
+                  {air.data_type === 'modeled' ? 'Open-Meteo Modeled' : 'OpenAQ / CPCB'}
                 </span>
               </div>
 
@@ -600,8 +600,10 @@ export function OverviewView({ onNavigate, onOpenChat }) {
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: '0.84rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Sensor Network</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.84rem' }}>Ground In-Situ Array</span>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Data Provenance</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.84rem' }}>
+                    {air.data_type === 'modeled' ? 'CAMS Atmospheric Model' : 'Physical Ground Sensor'}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.84rem' }}>
                   <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Station Node</span>
@@ -732,15 +734,16 @@ export function OverviewView({ onNavigate, onOpenChat }) {
                   <span style={{
                     display: 'inline-flex',
                     alignItems: 'center',
+                    gap: '5px',
                     padding: '2px 8px',
                     borderRadius: '999px',
                     fontSize: '0.75rem',
                     fontWeight: 600,
-                    background: '#F1F5F9',
-                    color: '#334155',
-                    border: '1px solid #E2E8F0',
+                    background: derived.coastal_flood_risk?.estuarine_compound_risk ? '#FEF2F2' : '#F1F5F9',
+                    color: derived.coastal_flood_risk?.estuarine_compound_risk ? '#B91C1C' : '#334155',
+                    border: derived.coastal_flood_risk?.estuarine_compound_risk ? '1px solid #FECACA' : '1px solid #E2E8F0',
                   }}>
-                    Low Risk
+                    {derived.coastal_flood_risk?.estuarine_compound_risk ? 'Compound Estuarine Risk' : (derived.coastal_flood_risk?.level ? `${derived.coastal_flood_risk.level.toUpperCase()} RISK` : 'Low Risk')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.84rem' }}>
@@ -856,9 +859,9 @@ export function OverviewView({ onNavigate, onOpenChat }) {
         }}>
           <div className="card" style={{ padding: '20px' }}>
             <span className="badge badge-neutral" style={{ marginBottom: '10px' }}>Stage 01</span>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px' }}>7 Independent Streams</h3>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px' }}>10 Independent Streams</h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Open-Meteo Weather, Marine Hydrodynamics, OpenAQ Sensor Arrays, Sunrise-Sunset ephemeris, USGS Seismics, Elevation, and NASA POWER.
+              Open-Meteo Weather, Marine Hydrodynamics, OpenAQ Sensor Arrays (with CAMS atmospheric fallback), GloFAS River Flood, GDACS Cyclone Tracking, NASA FIRMS Fire Hotspots, Sunrise-Sunset ephemeris, USGS Seismics, Elevation, and NASA POWER.
             </p>
           </div>
 
@@ -866,7 +869,7 @@ export function OverviewView({ onNavigate, onOpenChat }) {
             <span className="badge badge-neutral" style={{ marginBottom: '10px' }}>Stage 02</span>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px' }}>Concurrent Fan-Out</h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Dispatches all 7 upstream queries simultaneously via ThreadPoolExecutor. Total request latency is bounded by the slowest source (~2.6s) rather than sequential sum (~10s).
+              Dispatches all 10 upstream queries simultaneously via ThreadPoolExecutor. Total request latency is bounded by the slowest source (~2.6s) rather than sequential sum (~14s).
             </p>
           </div>
 
@@ -1315,7 +1318,7 @@ export function OverviewView({ onNavigate, onOpenChat }) {
             </div>
             <h3 style={{ fontSize: '0.98rem', fontWeight: 700, marginBottom: '6px' }}>Environmental & Climate Research</h3>
             <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Longitudinal atmospheric-marine observation archive, air quality stagnation indices, and solar radiation baselines across 5 coastal corridors.
+              Longitudinal atmospheric-marine observation archive, air quality stagnation indices, and solar radiation baselines across 5 coastal corridors covering India's South, West, and East coasts.
             </p>
           </div>
         </div>

@@ -2,12 +2,12 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/Tests-194%20Total%20(190%20Offline%20%2B%204%20Remote)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-212%20Total%20(203%20Offline%20%2B%209%20Remote)-brightgreen.svg)](tests/)
 [![CI](https://github.com/csharikrishna/Confluence/actions/workflows/tests.yml/badge.svg)](.github/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Render](https://img.shields.io/badge/Deploy-Render-46E3B7.svg?logo=render&logoColor=white)](https://confluence-si41.onrender.com)
 
-A normalized API and platform that concurrently aggregates **50+ physical, marine, and atmospheric hyperparameters** across **7 free public data sources** into a single validated JSON snapshot — then connects those raw numbers into **physics-informed composite signals** (heat index, sea state, storm potential, coastal flood risk) and a **config-driven alerting layer**, backed by persisted history across a **multi-location registry**.
+A normalized API and platform that concurrently aggregates **50+ physical, marine, and atmospheric hyperparameters** across **10 free public data sources** into a single validated JSON snapshot — then connects those raw numbers into **physics-informed composite signals** (heat index, sea state, storm potential, coastal flood risk, compound estuarine discharge, tropical cyclone proximity, and active fire/smoke causality) and a **config-driven alerting layer**, backed by persisted history across a **multi-location registry** covering 5 coastal locations across India's South, West, and East coasts (Chennai, Kochi, Visakhapatnam, Mumbai, Kolkata/Sundarbans).
 
 Built to **ground frontier AI models** and maritime decision systems in empirical, real-time physical truth — reducing weather hallucinations and enabling operational safety advisories that cite verified observations instead of training-data priors.
 
@@ -48,8 +48,8 @@ Built to **ground frontier AI models** and maritime decision systems in empirica
 
 ## Highlights
 
-- **50+ hyperparameters across 7 free APIs** — atmospheric weather, sea-state hydrodynamics, dual-tier air quality, solar/nautical twilight ephemeris, topography/elevation, climate baselines, and recent seismic events.
-- **Concurrent fan-out** — all 7 upstream sources are dispatched simultaneously via `ThreadPoolExecutor`, bounding total latency to the single slowest source (~2.4s) rather than the sum of all seven (~10s).
+- **50+ hyperparameters across 10 free APIs** — atmospheric weather, sea-state hydrodynamics, dual-tier air quality (OpenAQ sensor array + Open-Meteo CAMS atmospheric model fallback), river discharge & estuarine flood forecasting, GDACS global tropical cyclone tracking, NASA FIRMS satellite fire/hotspot causality, solar/nautical twilight ephemeris, topography/elevation, climate baselines, and recent seismic events.
+- **Concurrent fan-out** — all 10 upstream sources are dispatched simultaneously via `ThreadPoolExecutor`, bounding total latency to the single slowest source (~2.4s) rather than sequential execution (~14s).
 - **Two-tier caching** — a 24h station-metadata cache eliminates redundant spatial discovery, and a 5-minute response cache serves repeated queries in well under a millisecond (`bypass_cache=true` to force a fresh fetch).
 - **Data-quality sentinel** — every response is checked against physical boundaries (no negative wave heights, no >100% humidity, no out-of-range pressure) before it's returned.
 - **Production-hardened** — tiered rate limiting (slowapi), global exception handlers preventing stack trace leakage, structured request logging, and CI gates on every push.
@@ -60,9 +60,9 @@ Built to **ground frontier AI models** and maritime decision systems in empirica
 
 ---
 
-## AI Agent & MCP Integration (Claude Desktop & Cursor)
+## AI Agent & MCP Integration (Claude Desktop, Cursor & MCP Clients)
 
-Confluence provides an official **Model Context Protocol (MCP)** server ([`packages/confluence-mcp`](packages/confluence-mcp)) enabling Claude Desktop, Cursor, and enterprise AI agents to query live coastal sensor telemetry and physics derivations directly with a single configuration block:
+Confluence provides an official **Model Context Protocol (MCP)** server ([`packages/confluence-mcp`](packages/confluence-mcp)) enabling Anthropic Claude Desktop, Claude Code, Cursor, Zed, Cline, and standard MCP clients to query live coastal sensor telemetry and physics derivations directly. *(Note: MCP is an open standard originated by Anthropic; distinct from OpenAI's proprietary Custom GPTs API).*
 
 ### Claude Desktop Configuration
 Add to `claude_desktop_config.json` (`%APPDATA%\Claude\claude_desktop_config.json` on Windows or `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
@@ -101,8 +101,8 @@ Add to `.cursor/mcp.json`:
 
 ### Exposed MCP Capabilities
 - **Tools**:
-  - `get_coastal_snapshot`: 7-in-1 real-time telemetry + NOAA Heat Index, WMO Beaufort force, small craft advisories, and storm surge.
-  - `get_preset_locations`: Validated coastal observatories (Chennai, Mumbai, Kochi, Visakhapatnam, Kolkata/Sundarbans).
+  - `get_coastal_snapshot`: 10-in-1 real-time telemetry + NOAA Heat Index, WMO Beaufort force, small craft advisories, GDACS cyclone advisories, NASA FIRMS fire attribution, storm surge, and compound river flood risk.
+  - `get_preset_locations`: Validated coastal observatories across India's South, West, and East coasts (Chennai, Mumbai, Kochi, Visakhapatnam, Kolkata/Sundarbans).
   - `check_coastal_alerts`: Threshold breaches, cyclone depressions, and hazard advisories.
   - `get_historical_trends`: 24-hour physical deltas (temperature, pressure fall, wave height, wind).
   - `ask_coastal_assistant`: Sensor-grounded natural language maritime guidance.
@@ -117,7 +117,10 @@ Add to `.cursor/mcp.json`:
 | :--- | :--- | :--- | :--- |
 | Weather & atmosphere | Open-Meteo Forecast | Free, no key | `temperature_c`, `apparent_temperature_c`, `wind_speed_kmh`, `wind_gusts_kmh`, `wind_direction_deg`, `humidity_pct`, `pressure_hpa`, `surface_pressure_hpa`, `precipitation_mm`, `cloud_cover_pct`, `uv_index`, `visibility_m`, `weather_code` (WMO), `weather_description`, `is_day` |
 | Ocean hydrodynamics | Open-Meteo Marine | Free, no key | `sea_surface_temp_c`, `wave_height_m`, `wave_period_s`, `wave_direction_deg`, `wind_wave_height_m`, `wind_wave_period_s`, `wind_wave_direction_deg`, `swell_wave_height_m`, `swell_wave_period_s`, `swell_wave_direction_deg`, `ocean_current_velocity_kmh`, `ocean_current_direction_deg` |
-| Air quality & chemistry | OpenAQ + Open-Meteo fallback | Free tier / free, no key | `pm25`, `pm10`, `o3`, `no2`, `so2`, `co`, `aqi_category` (EPA), `us_aqi`, `european_aqi`, `dust_ug_m3`, `aerosol_optical_depth`, `tier` (`ground_sensor` or `atmospheric_model`) |
+| Air quality & chemistry | OpenAQ + Open-Meteo fallback | Free tier / free, no key | `pm25`, `pm10`, `o3`, `no2`, `so2`, `co`, `aqi_category` (EPA), `us_aqi`, `european_aqi`, `dust_ug_m3`, `aerosol_optical_depth`, `data_type` (`measured` ground sensors or `modeled` CAMS atmospheric estimates) |
+| River hydrology & flood risk | Open-Meteo Flood | Free, no key | `river_discharge_m3s`, `discharge_max_7d_m3s`, `applicable` (Copernicus GloFAS river basin model) |
+| Tropical cyclone tracking | GDACS (UN / EC JRC) | Free, no key | `active_cyclone_nearby`, `nearest_cyclone_name`, `nearest_cyclone_distance_km`, `cyclone_alert_level`, `max_wind_speed_kmh`, `active_cyclones_count` |
+| Active fire & smoke causality | NASA FIRMS (VIIRS/MODIS) | Free (NRT open feed / key) | `hotspot_count`, `nearest_hotspot_distance_km`, `max_frp_mw`, `high_confidence_count`, `fire_detected`, `search_radius_km` |
 | Astronomical & marine lighting | Sunrise-Sunset.org | Free, no key | `sunrise`, `sunset`, `solar_noon`, `day_length_hours`, civil/nautical/astronomical twilight begin/end |
 | Topography & elevation | Open-Meteo Elevation | Free, no key | `elevation_m`, `coastal_risk_category` (`low-lying (<5m)` vs `elevated`) |
 | Climate baseline | NASA POWER | Free, no key | `solar_radiation_kwh_m2`, `avg_temperature_c`, `avg_wind_speed_ms`, `observed_at` |
@@ -183,11 +186,11 @@ Confluence/
 │   ├── app.py                # FastAPI routes, lifespan, middleware & static mounts
 │   ├── auth.py               # Argon2id password hashing, sessions & API key auth
 │   ├── chat.py / chatbot.py  # Grounded LLM reasoning & safety audit prompt builder
-│   ├── environmental_data.py # 7-source concurrent ingestion pipeline & normalizers
-│   ├── derived_insights.py   # Physics signals (Heat Index, Beaufort, small craft)
+│   ├── environmental_data.py # 8-source concurrent ingestion pipeline & normalizers
+│   ├── derived_insights.py   # Physics signals (Heat Index, Beaufort, small craft, estuarine flood)
 │   ├── rules_engine.py       # Config-driven hazard evaluation engine
 │   ├── alert_rules.json      # Threshold and trend condition definitions
-│   ├── locations.py / .json  # 5 registered coastal stations registry
+│   ├── locations.py / .json  # 5 registered coastal stations across South, West, and East coasts
 │   ├── notifications.py      # Slack/Discord webhook dispatcher
 │   ├── gdrive_backup.py      # Daily disaster-recovery snapshot exporter
 │   ├── db_backend.py         # Storage router (SQLite / MongoDB Atlas)
@@ -239,7 +242,7 @@ Evaluates the rules engine against all registered locations or a specific `lat`/
 Returns service status, rate limiting, caching state, and storage backend connectivity.
 
 #### `GET /api/health/upstream`
-Pings all 7 upstream sources concurrently and returns live status, HTTP code, and latency in milliseconds.
+Pings all 10 upstream sources concurrently and returns live status, HTTP code, and latency in milliseconds.
 
 ---
 
@@ -288,8 +291,10 @@ Every `/environment` response includes `meta.derived_insights` — composite sig
 | `storm_potential_score` / `_level` | Pressure + gusts + cloud cover + 3h pressure trend | Engineering heuristic |
 | `rapid_pressure_fall` | 24h pressure change, latitude-normalized | Bergeron / Sanders-Gyakum rapid-cyclogenesis criterion |
 | `air_stagnation_index` | Wind + precipitation + PM2.5 | Engineering heuristic |
-| `coastal_flood_risk` | Elevation + wave height + wind + inverse-barometer surge | Inverse barometer effect (~1cm sea-level rise per 1hPa deficit) |
+| `coastal_flood_risk` | Elevation + wave height + wind + inverse-barometer surge + river discharge | Inverse barometer effect (~1cm sea-level rise per 1hPa deficit) + Copernicus GloFAS compound estuarine discharge |
 | `tsunami_advisory` | Seismic magnitude + depth + elevation | USGS shallow-focus (<70km) criterion |
+| `cyclone_advisory` | Proximity + intensity + alert level | GDACS global multi-hazard tropical cyclone tracking (distance and maritime warning) |
+| `air_quality_causality` | PM2.5 + satellite thermal hotspots | NASA FIRMS VIIRS/MODIS active fire anomaly spatial attribution (<300 km) |
 
 Full citations and scope notes: [`backend/derived_insights.py`](backend/derived_insights.py).
 
@@ -321,16 +326,16 @@ Passwords are cryptographically secured using **Argon2id**, and API keys use hig
 
 ## Testing
 
-The project maintains a rigorous **194-test automated test suite**:
+The project maintains a rigorous **212-test automated test suite**:
 
-### Offline unit & mocked integration suite (190 tests)
+### Offline unit & mocked integration suite (203 tests)
 Covers boundary sanity checks, ISO-UTC normalization, coordinate validation, failure degradation, physics calculations, rules engine scenarios, dual storage backends, Argon2id auth, and grounded prompt schemas.
 
 ```bash
 pytest tests/ --ignore=tests/test_live_remote.py -v
 ```
 
-### Live remote deployment suite (4 tests)
+### Live remote deployment suite (9 tests)
 Verifies the deployed service directly — connectivity, CORS, cache hits, 400 handling.
 
 ```bash

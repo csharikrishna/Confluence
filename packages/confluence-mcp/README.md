@@ -4,9 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 
-An official **Model Context Protocol (MCP)** server providing frontier AI models (Claude Desktop, Cursor, Windsurf, LangChain, LlamaIndex) with direct, authoritative access to the **Confluence Coastal Environmental Intelligence Platform**.
+An official **Model Context Protocol (MCP)** server providing compatible AI environments (**Anthropic Claude Desktop, Claude Code, Cursor, Zed, Cline**) with direct, authoritative access to the **Confluence Coastal Environmental Intelligence Platform**.
 
-Confluence connects AI agents to **7 concurrent scientific feeds** (weather, ocean/marine, air quality, astronomical, terrain, climate baseline, seismic) normalized into a single, sub-second snapshot with **deterministic physics derivations** (NOAA Heat Index, Magnus-Tetens dew point, WMO Beaufort force, IMD cyclone scales, inverse barometer storm surge, and Bergeron pressure fall criteria).
+Confluence connects AI agents to **10 concurrent scientific feeds** (weather, ocean/marine, air quality, river basin hydrology & flood, GDACS tropical cyclone tracking, NASA FIRMS active fire/hotspots, astronomical, terrain, climate baseline, seismic) normalized into a single, sub-second snapshot with **deterministic physics derivations** (NOAA Heat Index, Magnus-Tetens dew point, WMO Beaufort force, IMD cyclone scales, inverse barometer storm surge, compound estuarine flooding, GDACS cyclone advisories, NASA FIRMS smoke causality, and Bergeron pressure fall criteria).
+
+*(Note on client ecosystem: MCP is an open protocol specification originated by Anthropic and supported by native MCP clients like Claude Desktop, Cursor, and Zed. It is distinct from OpenAI's proprietary Assistants / Custom GPTs API).*
 
 ---
 
@@ -71,17 +73,17 @@ In your workspace root, create or edit `.cursor/mcp.json`:
 Frontier models can autonomously invoke the following 5 tools:
 
 ### 1. `get_coastal_snapshot`
-Fetches the complete 7-in-1 real-time environmental snapshot with calculated physics metrics:
+Fetches the complete 10-in-1 real-time environmental snapshot with calculated physics metrics:
 - **Parameters:**
   - `latitude` (number, required): -90 to 90
   - `longitude` (number, required): -180 to 180
   - `location_name` (string, optional): e.g. "Chennai Coast"
 - **Returns:**
-  - Full atmospheric, oceanographic, air quality, solar, and seismic parameters.
-  - Calculated physical metrics: NOAA Heat Index Category, Magnus-Tetens Dew Point, WMO Beaufort Scale force, Small Craft Advisory status, Inverse Barometer Storm Surge (cm), and 24h rapid pressure drop.
+  - Full atmospheric, oceanographic, air quality, river flood, cyclone tracking, active fire hotspots, solar, and seismic parameters.
+  - Calculated physical metrics: NOAA Heat Index Category, Magnus-Tetens Dew Point, WMO Beaufort Scale force, Small Craft Advisory status, GDACS Tropical Cyclone proximity alert, NASA FIRMS biomass burning attribution, Inverse Barometer Storm Surge (cm), and 24h rapid pressure drop.
 
 ### 2. `get_preset_locations`
-Lists pre-configured coastal observatories already validated in the Confluence system (e.g. Chennai, Mumbai, Kochi, Visakhapatnam, Kolkata/Sundarbans, Goa, Mangalore).
+Lists pre-configured coastal observatories across India's South, West, and East coasts (Chennai, Mumbai, Kochi, Visakhapatnam, Kolkata/Sundarbans).
 - **Parameters:** None.
 - **Returns:** Markdown table of stations, coordinates, and regional characteristics.
 

@@ -1,8 +1,8 @@
 """
 Core environmental data pipeline — concurrently fetches and normalizes readings
-from 7 independent free APIs (weather, marine, air quality, astronomical,
-terrain, climate baseline, seismic) into one unified JSON snapshot. This is the
-data layer app.py's /environment endpoint is built on, not a test file.
+from 10 independent scientific APIs (weather, marine, river flood, air quality,
+astronomical, terrain, climate baseline, seismic, GDACS cyclone tracking, NASA FIRMS fire)
+into one unified JSON snapshot. This is the data layer app.py's /environment endpoint is built on.
 
 Each source is fetched independently — if one fails, the others still return.
 """
@@ -39,6 +39,7 @@ LOCATION = {
 
 # Strictly read from environment variable — no hardcoded secrets in source
 OPENAQ_API_KEY = os.getenv("OPENAQ_API_KEY")
+FIRMS_MAP_KEY = os.getenv("FIRMS_MAP_KEY")
 
 TIMEOUT = 10  # seconds, default per request
 
@@ -50,6 +51,19 @@ STATION_CACHE = cachetools.TTLCache(maxsize=1000, ttl=86400)
 # 2. Response-level unified snapshot cache: maps (round(lat, 3), round(lon, 3)) -> full snapshot dict
 #    TTL = 5 minutes (300s) to serve repeated requests with sub-millisecond response times.
 SNAPSHOT_CACHE = cachetools.TTLCache(maxsize=500, ttl=300)
+
+# 3. GDACS & NASA FIRMS upstream cache: prevents hammering external disaster/satellite services
+GDACS_CACHE = cachetools.TTLCache(maxsize=50, ttl=300)
+FIRMS_CACHE = cachetools.TTLCache(maxsize=50, ttl=300)
+
+
+def haversine_distance_km(lat1, lon1, lat2, lon2):
+    """Calculate great-circle distance in kilometers between two points on the Earth."""
+    r = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi, dlam = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2.0) ** 2
+    return round(r * 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a)), 2)
 
 
 def now_iso():
@@ -192,6 +206,24 @@ def validate_environmental_data(data):
         elev = terrain.get("elevation_m")
         if elev is not None and elev < -500.0:
             warnings.append(f"Elevation {elev} m is below deepest land depression bounds")
+
+    flood = data.get("river_flood", {})
+    if flood.get("status") == "ok":
+        dis = flood.get("river_discharge_m3s")
+        if dis is not None and dis < 0:
+            warnings.append(f"River discharge {dis} m³/s cannot be negative")
+
+    cyclone = data.get("cyclone_tracking", {})
+    if cyclone.get("status") == "ok":
+        w = cyclone.get("max_wind_speed_kmh")
+        if w is not None and w < 0:
+            warnings.append(f"Cyclone wind speed {w} km/h cannot be negative")
+
+    fires = data.get("thermal_hotspots", {})
+    if fires.get("status") == "ok":
+        frp = fires.get("max_frp_mw")
+        if frp is not None and frp < 0:
+            warnings.append(f"Fire radiative power {frp} MW cannot be negative")
 
     return warnings
 
@@ -422,6 +454,7 @@ def fetch_air_quality(lat, lon, api_key=None, timeout=TIMEOUT, base_url="https:/
         latency_ms = round((time.perf_counter() - t0) * 1000, 2)
         return {
             "station_name": station_name,
+            "data_type": "measured",
             "pm25": parsed.get("pm25"),
             "pm10": parsed.get("pm10"),
             "o3": parsed.get("o3"),
@@ -481,6 +514,7 @@ def fetch_model_air_quality(lat, lon, timeout=TIMEOUT):
         return {
             "station_name": "Global CAMS Atmospheric Model (Open-Meteo)",
             "tier": "atmospheric_model",
+            "data_type": "modeled",
             "pm25": pm25,
             "pm10": cur.get("pm10"),
             "o3": cur.get("ozone"),
@@ -492,14 +526,14 @@ def fetch_model_air_quality(lat, lon, timeout=TIMEOUT):
             "dust_ug_m3": cur.get("dust"),
             "aerosol_optical_depth": cur.get("aerosol_optical_depth"),
             "aqi_category": aqi_category,
-            "source": "open-meteo-air-quality",
+            "source": "open-meteo-air-quality-modeled",
             "observed_at": normalize_iso_utc(cur.get("time")),
             "status": "ok",
             "latency_ms": latency_ms,
         }
     except Exception as e:
         latency_ms = round((time.perf_counter() - t0) * 1000, 2)
-        return {"source": "open-meteo-air-quality", "status": "error", "error": str(e), "latency_ms": latency_ms}
+        return {"source": "open-meteo-air-quality-modeled", "status": "error", "error": str(e), "latency_ms": latency_ms}
 
 
 # ---------------------------------------------------------------------------
@@ -689,6 +723,328 @@ def fetch_climate_baseline(lat, lon, timeout=TIMEOUT, base_url="https://power.la
 
 
 # ---------------------------------------------------------------------------
+# 8. OPEN-METEO — RIVER DISCHARGE & FLOOD API (FREE, NO KEY)
+# ---------------------------------------------------------------------------
+
+def fetch_river_discharge(lat, lon, timeout=TIMEOUT, base_url="https://flood-api.open-meteo.com/v1/flood"):
+    """
+    Open-Meteo Global Flood API (Free, zero API key required).
+    Provides daily river discharge (m³/s) based on the Copernicus GloFAS model.
+    Evaluates upstream river discharge for estuarine / deltaic compound flood risk.
+    Non-basin coordinates (e.g. open ocean) gracefully return applicable=False.
+    """
+    t0 = time.perf_counter()
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "daily": "river_discharge",
+    }
+    try:
+        r = requests.get(base_url, params=params, timeout=timeout)
+        r.raise_for_status()
+        res = r.json()
+        daily = res.get("daily", {})
+        times = daily.get("time", [])
+        discharges = daily.get("river_discharge", [])
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        # Filter out valid numeric discharge values
+        valid_discharges = [d for d in discharges if d is not None]
+        observed_time = times[0] if times else None
+
+        if not valid_discharges:
+            return {
+                "river_discharge_m3s": None,
+                "discharge_max_7d_m3s": None,
+                "applicable": False,
+                "note": "No active river basin mapped within hydrological grid cell",
+                "source": "open-meteo-flood",
+                "observed_at": normalize_iso_utc(observed_time) if observed_time else now_iso(),
+                "status": "ok",
+                "latency_ms": latency_ms,
+            }
+
+        curr_discharge = discharges[0] if (discharges and discharges[0] is not None) else valid_discharges[0]
+        max_7d = max(valid_discharges[:7]) if len(valid_discharges) >= 1 else curr_discharge
+
+        return {
+            "river_discharge_m3s": round(float(curr_discharge), 2) if curr_discharge is not None else None,
+            "discharge_max_7d_m3s": round(float(max_7d), 2) if max_7d is not None else None,
+            "applicable": True,
+            "note": None,
+            "source": "open-meteo-flood",
+            "observed_at": normalize_iso_utc(observed_time) if observed_time else now_iso(),
+            "status": "ok",
+            "latency_ms": latency_ms,
+        }
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        return {
+            "source": "open-meteo-flood",
+            "status": "error",
+            "error": str(e),
+            "applicable": False,
+            "latency_ms": latency_ms,
+        }
+
+
+# ---------------------------------------------------------------------------
+# 9. GDACS — GLOBAL DISASTER ALERT & COORDINATION SYSTEM (TROPICAL CYCLONES)
+# ---------------------------------------------------------------------------
+
+def fetch_gdacs_cyclones(lat, lon, timeout=TIMEOUT, base_url="https://www.gdacs.org/xml/rss.xml"):
+    """
+    Global Disaster Alert and Coordination System (GDACS — UN / EC JRC).
+    Free, public feed (XML RSS / GeoJSON) — zero API key required.
+    Tracks active tropical cyclones worldwide with intensity, alert level,
+    and calculates maritime proximity distance from the station coordinates.
+    """
+    t0 = time.perf_counter()
+    headers = {"User-Agent": "Confluence-Platform/1.0"}
+
+    # Use 5-minute in-memory cache for upstream GDACS feed
+    cached_tcs = GDACS_CACHE.get("global_cyclones")
+    if cached_tcs is None:
+        try:
+            r = requests.get(base_url, headers=headers, timeout=timeout)
+            r.raise_for_status()
+            content = r.text.strip()
+            parsed_cyclones = []
+
+            if content.startswith("{") or content.startswith("["):
+                # GeoJSON or JSON format
+                data = r.json()
+                features = data.get("features", []) if isinstance(data, dict) else []
+                tc_features = [f for f in features if f.get("properties", {}).get("eventtype") == "TC"]
+                for feat in tc_features:
+                    props = feat.get("properties", {})
+                    geom = feat.get("geometry", {})
+                    coords = geom.get("coordinates", [])
+                    if len(coords) >= 2 and coords[0] is not None and coords[1] is not None:
+                        severity = props.get("severitydata", {})
+                        wind = severity.get("severity") if isinstance(severity, dict) else None
+                        parsed_cyclones.append({
+                            "name": props.get("name") or props.get("eventname") or "Unnamed Cyclone",
+                            "alert_level": props.get("alertlevel", "Green"),
+                            "wind_speed_kmh": round(float(wind), 1) if wind is not None else None,
+                            "latitude": float(coords[1]),
+                            "longitude": float(coords[0]),
+                            "report_url": props.get("url", {}).get("report") if isinstance(props.get("url"), dict) else None,
+                        })
+            else:
+                # Fast official GDACS XML RSS format
+                import xml.etree.ElementTree as ET
+                import re
+                root = ET.fromstring(r.content)
+                for item in root.findall(".//item"):
+                    etype = item.findtext("{http://www.gdacs.org}eventtype")
+                    if etype == "TC":
+                        name = item.findtext("{http://www.gdacs.org}eventname") or "Unnamed Cyclone"
+                        level = item.findtext("{http://www.gdacs.org}alertlevel") or "Green"
+                        severity = item.findtext("{http://www.gdacs.org}severity") or ""
+                        pt = item.findtext("{http://www.georss.org/georss}point")
+                        link = item.findtext("link") or ""
+                        wind_kmh = None
+                        m = re.search(r"(\d+)\s*km/h", severity)
+                        if m:
+                            wind_kmh = float(m.group(1))
+                        if pt:
+                            parts = pt.strip().split()
+                            if len(parts) >= 2:
+                                parsed_cyclones.append({
+                                    "name": name,
+                                    "alert_level": level,
+                                    "wind_speed_kmh": wind_kmh,
+                                    "latitude": float(parts[0]),
+                                    "longitude": float(parts[1]),
+                                    "report_url": link,
+                                })
+
+            cached_tcs = parsed_cyclones
+            GDACS_CACHE["global_cyclones"] = cached_tcs
+        except Exception as e:
+            latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+            return {
+                "source": "gdacs-cyclone",
+                "status": "error",
+                "error": str(e),
+                "active_cyclone_nearby": False,
+                "cyclone_alert_level": "unknown",
+                "latency_ms": latency_ms,
+            }
+
+    latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+    cyclones_with_dist = []
+    for c in (cached_tcs or []):
+        dist_km = haversine_distance_km(lat, lon, c["latitude"], c["longitude"])
+        cyclones_with_dist.append({
+            "name": c["name"],
+            "alert_level": c["alert_level"],
+            "wind_speed_kmh": c.get("wind_speed_kmh"),
+            "distance_km": dist_km,
+            "latitude": c["latitude"],
+            "longitude": c["longitude"],
+            "report_url": c.get("report_url"),
+        })
+
+    cyclones_with_dist.sort(key=lambda x: x["distance_km"])
+    nearest = cyclones_with_dist[0] if cyclones_with_dist else None
+
+    # Regional maritime influence threshold: <=1000 km advisory, <=500 km critical warning
+    active_nearby = bool(nearest and nearest["distance_km"] <= 1000.0)
+
+    return {
+        "source": "gdacs-cyclone",
+        "active_cyclone_nearby": active_nearby,
+        "nearest_cyclone_name": nearest["name"] if nearest else None,
+        "nearest_cyclone_distance_km": nearest["distance_km"] if nearest else None,
+        "cyclone_alert_level": nearest["alert_level"] if nearest else "nominal",
+        "max_wind_speed_kmh": nearest["wind_speed_kmh"] if nearest else None,
+        "active_cyclones_count": len(cyclones_with_dist),
+        "nearby_cyclones": [c for c in cyclones_with_dist if c["distance_km"] <= 1500.0][:3],
+        "observed_at": now_iso(),
+        "status": "ok",
+        "latency_ms": latency_ms,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 10. NASA FIRMS — SATELLITE ACTIVE FIRE & THERMAL HOTSPOTS (MODIS / VIIRS)
+# ---------------------------------------------------------------------------
+
+def fetch_fire_hotspots(lat, lon, api_key=None, timeout=TIMEOUT):
+    """
+    NASA FIRMS (Fire Information for Resource Management System).
+    Detects real-time satellite fire / thermal anomalies (VIIRS/MODIS) within a 300km radius.
+    Identifies upstream agricultural/crop burning or wildfires as physical causal drivers
+    for elevated PM2.5 particulate pollution.
+
+    If FIRMS_MAP_KEY is provided, queries the exact bounding box.
+    If no key is configured, seamlessly falls back to NASA FIRMS's open NRT South Asia
+    VIIRS feed (zero key required).
+    """
+    t0 = time.perf_counter()
+    key = api_key or FIRMS_MAP_KEY
+    search_radius_km = 300.0
+    headers = {"User-Agent": "Confluence-Platform/1.0"}
+
+    try:
+        if key:
+            west = round(lon - 2.5, 3)
+            south = round(lat - 2.5, 3)
+            east = round(lon + 2.5, 3)
+            north = round(lat + 2.5, 3)
+            cache_k = f"firms_bbox_{west}_{south}_{east}_{north}"
+            lines = FIRMS_CACHE.get(cache_k)
+            if lines is None:
+                url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/1"
+                r = requests.get(url, headers=headers, timeout=timeout)
+                r.raise_for_status()
+                lines = r.text.strip().splitlines()
+                FIRMS_CACHE[cache_k] = lines
+        else:
+            lines = FIRMS_CACHE.get("firms_south_asia_open")
+            if lines is None:
+                url = "https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_South_Asia_24h.csv"
+                r = requests.get(url, headers=headers, timeout=timeout)
+                r.raise_for_status()
+                lines = r.text.strip().splitlines()
+                FIRMS_CACHE["firms_south_asia_open"] = lines
+
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        if not lines or len(lines) <= 1:
+            return {
+                "source": "nasa-firms",
+                "status": "ok",
+                "hotspot_count": 0,
+                "high_confidence_count": 0,
+                "fire_detected": False,
+                "nearest_hotspot_distance_km": None,
+                "max_frp_mw": None,
+                "search_radius_km": search_radius_km,
+                "observed_at": now_iso(),
+                "latency_ms": latency_ms,
+            }
+
+        header = [h.strip() for h in lines[0].split(",")]
+        lat_idx = header.index("latitude") if "latitude" in header else -1
+        lon_idx = header.index("longitude") if "longitude" in header else -1
+        frp_idx = header.index("frp") if "frp" in header else -1
+        conf_idx = header.index("confidence") if "confidence" in header else -1
+        date_idx = header.index("acq_date") if "acq_date" in header else -1
+        time_idx = header.index("acq_time") if "acq_time" in header else -1
+
+        if lat_idx < 0 or lon_idx < 0:
+            return {
+                "source": "nasa-firms",
+                "status": "ok",
+                "hotspot_count": 0,
+                "fire_detected": False,
+                "nearest_hotspot_distance_km": None,
+                "max_frp_mw": None,
+                "search_radius_km": search_radius_km,
+                "observed_at": now_iso(),
+                "latency_ms": latency_ms,
+            }
+
+        nearby_hotspots = []
+        for line in lines[1:]:
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) <= max(lat_idx, lon_idx):
+                continue
+            try:
+                f_lat = float(parts[lat_idx])
+                f_lon = float(parts[lon_idx])
+                dist = haversine_distance_km(lat, lon, f_lat, f_lon)
+                if dist <= search_radius_km:
+                    frp = float(parts[frp_idx]) if (frp_idx >= 0 and parts[frp_idx]) else 0.0
+                    conf = parts[conf_idx] if conf_idx >= 0 else "nominal"
+                    acq_d = parts[date_idx] if date_idx >= 0 else ""
+                    acq_t = parts[time_idx] if time_idx >= 0 else ""
+                    nearby_hotspots.append({
+                        "latitude": f_lat,
+                        "longitude": f_lon,
+                        "distance_km": dist,
+                        "frp_mw": frp,
+                        "confidence": conf,
+                        "acquired": f"{acq_d} {acq_t}".strip(),
+                    })
+            except (ValueError, TypeError):
+                continue
+
+        nearby_hotspots.sort(key=lambda x: x["distance_km"])
+        count = len(nearby_hotspots)
+        nearest_dist = nearby_hotspots[0]["distance_km"] if nearby_hotspots else None
+        max_frp = max((h["frp_mw"] for h in nearby_hotspots), default=None)
+        high_conf = sum(1 for h in nearby_hotspots if str(h["confidence"]).lower() in ["h", "high", "nominal"])
+
+        return {
+            "source": "nasa-firms",
+            "status": "ok",
+            "hotspot_count": count,
+            "high_confidence_count": high_conf,
+            "fire_detected": count > 0,
+            "nearest_hotspot_distance_km": nearest_dist,
+            "max_frp_mw": round(max_frp, 1) if max_frp is not None else None,
+            "search_radius_km": search_radius_km,
+            "sample_hotspots": nearby_hotspots[:5],
+            "observed_at": now_iso(),
+            "latency_ms": latency_ms,
+        }
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        return {
+            "source": "nasa-firms",
+            "status": "error",
+            "error": str(e),
+            "hotspot_count": 0,
+            "fire_detected": False,
+            "latency_ms": latency_ms,
+        }
+
+
+# ---------------------------------------------------------------------------
 # UNIFIED ENDPOINT LOGIC (CONCURRENT MULTI-DOMAIN FUSION)
 # ---------------------------------------------------------------------------
 
@@ -719,7 +1075,7 @@ def get_environmental_snapshot(lat, lon, name="Unnamed Location", timeout=TIMEOU
 
     t_start = time.perf_counter()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         f_weather = executor.submit(fetch_weather, lat, lon, timeout=timeout)
         f_marine = executor.submit(fetch_marine, lat, lon, timeout=timeout)
         f_aq = executor.submit(fetch_air_quality, lat, lon, api_key=openaq_api_key, timeout=timeout)
@@ -727,6 +1083,9 @@ def get_environmental_snapshot(lat, lon, name="Unnamed Location", timeout=TIMEOU
         f_elevation = executor.submit(fetch_elevation, lat, lon, timeout=timeout)
         f_climate = executor.submit(fetch_climate_baseline, lat, lon, timeout=timeout)
         f_seismic = executor.submit(fetch_seismic_risk, lat, lon, timeout=timeout)
+        f_flood = executor.submit(fetch_river_discharge, lat, lon, timeout=timeout)
+        f_cyclones = executor.submit(fetch_gdacs_cyclones, lat, lon, timeout=timeout)
+        f_fires = executor.submit(fetch_fire_hotspots, lat, lon, api_key=None, timeout=timeout)
 
         weather = f_weather.result()
         marine = f_marine.result()
@@ -735,10 +1094,25 @@ def get_environmental_snapshot(lat, lon, name="Unnamed Location", timeout=TIMEOU
         terrain = f_elevation.result()
         climate_baseline = f_climate.result()
         seismic_risk = f_seismic.result()
+        river_flood = f_flood.result()
+        cyclone_tracking = f_cyclones.result()
+        thermal_hotspots = f_fires.result()
+
+    # Conditional Open-Meteo Air Quality fallback:
+    # Trigger ONLY when OpenAQ reports "no station found" within radius (never parallel double-fetch)
+    if air_quality.get("status") == "error":
+        err_msg = str(air_quality.get("error", "")).lower()
+        if "no monitoring station" in err_msg or "no station" in err_msg:
+            model_aq = fetch_model_air_quality(lat, lon, timeout=timeout)
+            if model_aq.get("status") == "ok":
+                air_quality = model_aq
 
     total_latency_ms = round((time.perf_counter() - t_start) * 1000, 2)
 
-    sources = [weather, marine, air_quality, sun_and_lighting, terrain, climate_baseline, seismic_risk]
+    sources = [
+        weather, marine, air_quality, sun_and_lighting, terrain,
+        climate_baseline, seismic_risk, river_flood, cyclone_tracking, thermal_hotspots
+    ]
     failed = [s["source"] for s in sources if s.get("status") == "error"]
 
     if not failed:
@@ -756,6 +1130,9 @@ def get_environmental_snapshot(lat, lon, name="Unnamed Location", timeout=TIMEOU
         "terrain": terrain,
         "climate_baseline": climate_baseline,
         "seismic_risk": seismic_risk,
+        "river_flood": river_flood,
+        "cyclone_tracking": cyclone_tracking,
+        "thermal_hotspots": thermal_hotspots,
     }
 
     meta = {

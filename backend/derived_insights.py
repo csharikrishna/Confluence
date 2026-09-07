@@ -265,12 +265,12 @@ def air_stagnation_index(wind_speed_kmh, pm25, precipitation_mm=None):
     return "low"
 
 
-def coastal_flood_risk(elevation_m, wave_height_m, wind_speed_kmh, pressure_hpa):
+def coastal_flood_risk(elevation_m, wave_height_m, wind_speed_kmh, pressure_hpa, river_discharge_m3s=None):
     """Composite storm-surge/coastal-flood exposure: low elevation is the dominant
     term (it determines whether any surge reaches habitation), scaled up by sea
-    state and by the inverse barometer effect — the well-established oceanographic
-    relationship where sea level rises ~1cm for every 1hPa the local air pressure
-    drops below the standard 1013.25hPa reference.
+    state, the inverse barometer effect (~1cm sea-level rise per 1hPa air pressure
+    deficit below 1013.25hPa), and upstream river discharge (Copernicus GloFAS)
+    for estuarine / deltaic compound flooding (e.g. Kolkata/Sundarbans).
     """
     if elevation_m is None:
         return None
@@ -294,6 +294,23 @@ def coastal_flood_risk(elevation_m, wave_height_m, wind_speed_kmh, pressure_hpa)
         elif ib_surge_cm >= 5:
             score += 0.1
 
+    # Estuarine compound flood risk: upstream river discharge adds to flood exposure
+    estuarine_compound_risk = False
+    if river_discharge_m3s is not None and river_discharge_m3s > 0:
+        if river_discharge_m3s >= 50.0:
+            score += 0.2
+        elif river_discharge_m3s >= 20.0:
+            score += 0.1
+
+        # Compound risk fires when elevated river discharge meets marine surge / waves / winds at low elevation
+        has_marine_forcing = (
+            (wave_height_m is not None and wave_height_m >= 1.5) or
+            (ib_surge_cm is not None and ib_surge_cm >= 5.0) or
+            (wind_speed_kmh is not None and wind_speed_kmh >= 35.0)
+        )
+        if river_discharge_m3s >= 20.0 and has_marine_forcing and elevation_m < 10.0:
+            estuarine_compound_risk = True
+
     score = round(min(score, 1.0), 2)
     if score < 0.3:
         level = "low"
@@ -303,7 +320,124 @@ def coastal_flood_risk(elevation_m, wave_height_m, wind_speed_kmh, pressure_hpa)
         level = "high"
     else:
         level = "severe"
-    return {"score": score, "level": level, "inverse_barometer_surge_cm": ib_surge_cm}
+    return {
+        "score": score,
+        "level": level,
+        "inverse_barometer_surge_cm": ib_surge_cm,
+        "river_discharge_m3s": river_discharge_m3s,
+        "estuarine_compound_risk": estuarine_compound_risk,
+    }
+
+
+def cyclone_advisory(cyclone_domain):
+    """
+    Evaluates active tropical cyclone tracking data from GDACS (UN / EC JRC).
+    Flags whether an active named tropical cyclone is within maritime influence range (<1000km)
+    or critical port/vessel danger range (<500km).
+    """
+    if not cyclone_domain or cyclone_domain.get("status") != "ok":
+        return {
+            "advisory": False,
+            "level": "nominal",
+            "active_nearby": False,
+            "nearest_cyclone": None,
+            "distance_km": None,
+            "wind_speed_kmh": None,
+            "alert_level": "nominal",
+            "reason": None,
+        }
+
+    active_nearby = cyclone_domain.get("active_cyclone_nearby", False)
+    nearest_name = cyclone_domain.get("nearest_cyclone_name")
+    dist_km = cyclone_domain.get("nearest_cyclone_distance_km")
+    wind_kmh = cyclone_domain.get("max_wind_speed_kmh")
+    alert_lvl = cyclone_domain.get("cyclone_alert_level", "nominal")
+
+    if dist_km is not None and dist_km <= 500.0:
+        return {
+            "advisory": True,
+            "level": "critical",
+            "active_nearby": True,
+            "nearest_cyclone": nearest_name,
+            "distance_km": dist_km,
+            "wind_speed_kmh": wind_kmh,
+            "alert_level": alert_lvl,
+            "reason": f"Active Tropical Cyclone '{nearest_name}' within critical danger range ({dist_km:.1f}km, winds up to {wind_kmh or 'N/A'}km/h, GDACS {alert_lvl} Alert). Small vessel operations unsafe.",
+        }
+    elif dist_km is not None and dist_km <= 1000.0:
+        return {
+            "advisory": True,
+            "level": "caution",
+            "active_nearby": True,
+            "nearest_cyclone": nearest_name,
+            "distance_km": dist_km,
+            "wind_speed_kmh": wind_kmh,
+            "alert_level": alert_lvl,
+            "reason": f"Active Tropical Cyclone '{nearest_name}' monitored in maritime quadrant ({dist_km:.1f}km away, winds {wind_kmh or 'N/A'}km/h, GDACS {alert_lvl} Alert).",
+        }
+
+    return {
+        "advisory": False,
+        "level": "nominal",
+        "active_nearby": False,
+        "nearest_cyclone": nearest_name,
+        "distance_km": dist_km,
+        "wind_speed_kmh": wind_kmh,
+        "alert_level": alert_lvl,
+        "reason": None,
+    }
+
+
+def air_quality_causality(pm25, fire_domain):
+    """
+    Physical causality attribution for elevated particulate matter (PM2.5).
+    Cross-references elevated PM2.5 (>35.4 µg/m³, WHO/NAAQS threshold) with
+    NASA FIRMS real-time satellite fire hotspots (MODIS/VIIRS) within 300km
+    to differentiate upstream crop/biomass burning from urban background emissions.
+    """
+    if pm25 is None:
+        return {
+            "elevated_pm25": False,
+            "biomass_burning_detected": False,
+            "hotspots_within_300km": 0,
+            "nearest_hotspot_km": None,
+            "peak_frp_mw": None,
+            "causal_attribution": None,
+        }
+
+    fire_domain = fire_domain or {}
+    hotspots = fire_domain.get("hotspot_count", 0) if fire_domain.get("status") == "ok" else 0
+    nearest_dist = fire_domain.get("nearest_hotspot_distance_km")
+    max_frp = fire_domain.get("max_frp_mw")
+
+    if pm25 > 35.4:
+        if hotspots > 0:
+            return {
+                "elevated_pm25": True,
+                "biomass_burning_detected": True,
+                "hotspots_within_300km": hotspots,
+                "nearest_hotspot_km": nearest_dist,
+                "peak_frp_mw": max_frp,
+                "causal_attribution": f"Upstream agricultural or biomass burning detected by NASA FIRMS satellite ({hotspots} thermal hotspot(s) within 300km, nearest {nearest_dist}km, peak FRP {max_frp}MW). Significant physical contributor to elevated PM2.5.",
+            }
+        else:
+            return {
+                "elevated_pm25": True,
+                "biomass_burning_detected": False,
+                "hotspots_within_300km": 0,
+                "nearest_hotspot_km": None,
+                "peak_frp_mw": None,
+                "causal_attribution": "Urban, vehicular, and industrial emissions dominant (no NASA FIRMS active fire hotspots detected within 300km).",
+            }
+
+    return {
+        "elevated_pm25": False,
+        "biomass_burning_detected": hotspots > 0,
+        "hotspots_within_300km": hotspots,
+        "nearest_hotspot_km": nearest_dist,
+        "peak_frp_mw": max_frp,
+        "causal_attribution": "Nominal atmospheric air quality — no significant particulate pollution detected.",
+    }
 
 
 def tsunami_caution(max_magnitude, elevation_m, depth_km=None):
@@ -346,6 +480,10 @@ def compute_derived_insights(data, lat=None, pressure_change_24h_hpa=None, press
     aq = data.get("air_quality") or {}
     terrain = data.get("terrain") or {}
     seismic = data.get("seismic_risk") or {}
+    flood_domain = data.get("river_flood") or {}
+    cyclone_domain = data.get("cyclone_tracking") or {}
+    fire_domain = data.get("thermal_hotspots") or {}
+    river_discharge = flood_domain.get("river_discharge_m3s")
 
     temp = weather.get("temperature_c")
     humidity = weather.get("humidity_pct")
@@ -360,8 +498,16 @@ def compute_derived_insights(data, lat=None, pressure_change_24h_hpa=None, press
     craft = small_craft_risk(marine.get("wave_height_m"), wind, gusts)
     storm_score = storm_potential_score(pressure, gusts, cloud, pressure_change_3h_hpa)
     stagnation = air_stagnation_index(wind, aq.get("pm25"), precip)
-    flood = coastal_flood_risk(terrain.get("elevation_m"), marine.get("wave_height_m"), wind, pressure)
+    flood = coastal_flood_risk(terrain.get("elevation_m"), marine.get("wave_height_m"), wind, pressure, river_discharge)
     tsunami = tsunami_caution(seismic.get("max_magnitude"), terrain.get("elevation_m"), seismic.get("max_magnitude_depth_km"))
+    cyclone = cyclone_advisory(cyclone_domain)
+    aq_causality = air_quality_causality(aq.get("pm25"), fire_domain)
+
+    # If an active cyclone is within critical danger range (<500km), escalate small craft warning
+    if cyclone.get("advisory") and cyclone.get("level") == "critical":
+        if craft.get("level") in ["nominal", "caution"]:
+            craft["level"] = "critical"
+            craft["reasons"] = craft.get("reasons", []) + [cyclone["reason"]]
 
     return {
         "heat_index_c": hi,
@@ -378,11 +524,15 @@ def compute_derived_insights(data, lat=None, pressure_change_24h_hpa=None, press
         "air_stagnation_index": stagnation,
         "coastal_flood_risk": flood,
         "tsunami_advisory": tsunami,
+        "cyclone_advisory": cyclone,
+        "air_quality_causality": aq_causality,
         "methodology_note": (
             "Composite physical signals from published, cited sources: NOAA heat index regression, "
             "Magnus-Tetens dew point, WMO Beaufort scale, IMD cyclone classification, NWS coastal "
-            "marine warning wind/sea criteria, the inverse barometer effect, and the Bergeron/"
-            "Sanders-Gyakum latitude-normalized rapid-pressure-fall criterion — no machine learning "
+            "marine warning wind/sea criteria, the inverse barometer effect, the Bergeron/"
+            "Sanders-Gyakum latitude-normalized rapid-pressure-fall criterion, Copernicus GloFAS "
+            "river discharge for compound estuarine flooding, GDACS UN/JRC tropical cyclone tracking, "
+            "and NASA FIRMS MODIS/VIIRS satellite active fire causality — no machine learning "
             "or forecasting is involved. See docs/PHASE2_WALKTHROUGH.md for citations and honest "
             "scope notes on where these standards do and don't strictly apply."
         ),

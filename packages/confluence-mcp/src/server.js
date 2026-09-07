@@ -77,7 +77,7 @@ export async function main() {
   // --------------------------------------------------------------------------
   server.tool(
     "get_coastal_snapshot",
-    "Fetches authoritative 7-in-1 real-time coastal environmental snapshot for given coordinates, normalized from Open-Meteo, Copernicus/Marine, OpenAQ, Sunrise-Sunset, NASA POWER, Elevation, and USGS Seismic feeds, with deterministic physical calculations.",
+    "Fetches authoritative 10-in-1 real-time coastal environmental snapshot for given coordinates, normalized from Open-Meteo Weather, Marine, Flood/River Discharge, OpenAQ (with atmospheric model fallback), Sunrise-Sunset, NASA POWER, Elevation, USGS Seismic, GDACS Tropical Cyclone Tracking, and NASA FIRMS Active Fire Satellite feeds, with deterministic physical calculations.",
     {
       latitude: z.number().min(-90).max(90).describe("Geographic latitude (-90 to 90)"),
       longitude: z.number().min(-180).max(180).describe("Geographic longitude (-180 to 180)"),
@@ -96,7 +96,10 @@ export async function main() {
       const weather = data.weather || {};
       const marine = data.marine || {};
       const air = data.air_quality || {};
+      const flood = data.river_flood || {};
       const astro = data.astronomical || {};
+      const cyclone = data.cyclone_tracking || {};
+      const fire = data.thermal_hotspots || {};
       const meta = data.meta || {};
       const derived = meta.derived_insights || {};
       const alerts = meta.active_alerts || [];
@@ -123,14 +126,29 @@ export async function main() {
       report += `### 3. Air Quality & Particulates\n`;
       report += `- **PM2.5:** ${air.pm25 ?? "N/A"} µg/m³\n`;
       report += `- **PM10:** ${air.pm10 ?? "N/A"} µg/m³\n`;
-      report += `- **Air Quality Category:** ${air.air_quality_category ?? "Unknown"}\n\n`;
+      report += `- **Data Type / Provenance:** ${air.data_type ?? "N/A"} (${air.source ?? "N/A"})\n`;
+      report += `- **Air Quality Category:** ${air.aqi_category ?? air.air_quality_category ?? "Unknown"}\n\n`;
 
-      report += `### 4. Solar, Astronomical & Terrain\n`;
+      report += `### 4. River Basin Hydrology & Flood Risk\n`;
+      if (flood.applicable) {
+        report += `- **River Discharge:** ${flood.river_discharge_m3s ?? "N/A"} m³/s\n`;
+        report += `- **7-Day Max Discharge:** ${flood.discharge_max_7d_m3s ?? "N/A"} m³/s\n`;
+      } else {
+        report += `- **River Basin:** Not applicable (${flood.note || "open ocean / non-basin coordinate"})\n`;
+      }
+      report += `- **Estuarine Compound Flood Risk:** ${derived.coastal_flood_risk?.estuarine_compound_risk ? "⚠️ ELEVATED COMPOUND RISK" : "Normal"}\n\n`;
+
+      report += `### 5. Tropical Cyclone Tracking & Active Fire Causality\n`;
+      report += `- **GDACS Tropical Cyclone:** ${derived.cyclone_advisory?.advisory ? `⚠️ ${derived.cyclone_advisory.reason}` : `Nominal (Nearest: ${cyclone.nearest_cyclone_name || "None"} at ${cyclone.nearest_cyclone_distance_km ? `${cyclone.nearest_cyclone_distance_km} km` : "N/A"})`}\n`;
+      report += `- **NASA FIRMS Thermal Anomalies:** ${fire.hotspot_count ?? 0} active hotspot(s) within 300km (Peak FRP: ${fire.max_frp_mw ? `${fire.max_frp_mw} MW` : "N/A"})\n`;
+      report += `- **Air Quality Causality:** ${derived.air_quality_causality?.causal_attribution || "Nominal background"}\n\n`;
+
+      report += `### 6. Solar, Astronomical & Terrain\n`;
       report += `- **UV Index:** ${astro.uv_index ?? "N/A"}\n`;
       report += `- **Sunrise / Sunset:** ${astro.sunrise_time ?? "N/A"} / ${astro.sunset_time ?? "N/A"}\n`;
       report += `- **Elevation:** ${data.terrain?.elevation_m ?? "Sea Level"} m\n\n`;
 
-      report += `### 5. Deterministic Physics Insights (Peer-Reviewed Regressions)\n`;
+      report += `### 7. Deterministic Physics Insights (Peer-Reviewed Regressions)\n`;
       report += `- **NOAA Heat Index:** ${derived.heat_index_c ?? "N/A"} °C (Category: **${derived.heat_index_category ?? "Normal"}**)\n`;
       report += `- **Magnus-Tetens Dew Point:** ${derived.dew_point_c ?? "N/A"} °C\n`;
       report += `- **WMO Beaufort Scale:** Force ${derived.beaufort_scale?.force ?? "N/A"} (*${derived.beaufort_scale?.name ?? "N/A"}*)\n`;
@@ -142,7 +160,7 @@ export async function main() {
       report += `- **Inverse Barometer Storm Surge:** ${derived.coastal_flood_risk?.inverse_barometer_surge_cm ?? 0} cm sea surface elevation\n`;
       report += `- **Bergeron Rapid Pressure Fall (24h):** ${derived.rapid_pressure_fall?.change_24h_hpa ?? 0} hPa drop (Threshold: ${derived.rapid_pressure_fall?.latitude_normalized_threshold_hpa ?? "N/A"} hPa)\n\n`;
 
-      report += `### 6. Active Physical Alerts\n`;
+      report += `### 7. Active Physical Alerts\n`;
       if (alerts.length === 0) {
         report += `✅ **No active hazard warnings.** All environmental indicators within baseline limits.\n`;
       } else {
@@ -171,7 +189,7 @@ export async function main() {
   // --------------------------------------------------------------------------
   server.tool(
     "get_preset_locations",
-    "Returns the list of verified, pre-configured coastal observatories in the Confluence platform (e.g., Chennai, Mumbai, Kochi, Visakhapatnam, Kolkata/Sundarbans, Goa, Mangalore) with latitude, longitude, and marine characteristics.",
+    "Returns the list of verified, pre-configured coastal observatories across India's South, West, and East coasts (e.g., Chennai, Mumbai, Kochi, Visakhapatnam, Kolkata/Sundarbans) with latitude, longitude, and marine characteristics.",
     {},
     async () => {
       const res = await fetchConfluence("/locations");

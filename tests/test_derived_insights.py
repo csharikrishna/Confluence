@@ -24,6 +24,8 @@ from derived_insights import (
     air_stagnation_index,
     coastal_flood_risk,
     tsunami_caution,
+    cyclone_advisory,
+    air_quality_causality,
     compute_derived_insights,
 )
 
@@ -193,6 +195,31 @@ class TestCoastalFloodRisk(unittest.TestCase):
         result = coastal_flood_risk(elevation_m=3.0, wave_height_m=0.5, wind_speed_kmh=10.0, pressure_hpa=1020.0)
         self.assertEqual(result["inverse_barometer_surge_cm"], 0.0)
 
+    def test_river_discharge_compound_estuarine_flood_risk(self):
+        # Low elevation (4m) + moderate wave (1.8m) + elevated river discharge (55 m3/s) -> compound risk
+        result = coastal_flood_risk(
+            elevation_m=4.0,
+            wave_height_m=1.8,
+            wind_speed_kmh=25.0,
+            pressure_hpa=1010.0,
+            river_discharge_m3s=55.0
+        )
+        self.assertTrue(result["estuarine_compound_risk"])
+        self.assertEqual(result["river_discharge_m3s"], 55.0)
+        self.assertIn(result["level"], ("high", "severe"))
+
+    def test_river_discharge_non_basin_graceful(self):
+        # None river discharge should evaluate standard marine flood risk without compound flag
+        result = coastal_flood_risk(
+            elevation_m=3.0,
+            wave_height_m=0.8,
+            wind_speed_kmh=12.0,
+            pressure_hpa=1012.0,
+            river_discharge_m3s=None
+        )
+        self.assertFalse(result["estuarine_compound_risk"])
+        self.assertIsNone(result["river_discharge_m3s"])
+
 
 class TestBeaufortScale(unittest.TestCase):
     def test_calm_is_force_zero(self):
@@ -310,6 +337,81 @@ class TestComputeDerivedInsights(unittest.TestCase):
         self.assertIn(result["small_craft_risk_level"], _ADVISORY_OR_WORSE)
         self.assertIn(result["storm_potential_level"], ("moderate", "high", "severe"))
         self.assertEqual(result["beaufort_scale"]["name"], "strong breeze")  # 42.5 km/h -> Beaufort force 6
+
+    def test_cyclone_advisory_critical_nearby(self):
+        cyclone_domain = {
+            "status": "ok",
+            "active_cyclone_nearby": True,
+            "nearest_cyclone_name": "Tropical Cyclone Mocha",
+            "nearest_cyclone_distance_km": 340.5,
+            "max_wind_speed_kmh": 140.0,
+            "cyclone_alert_level": "Orange",
+        }
+        adv = cyclone_advisory(cyclone_domain)
+        self.assertTrue(adv["advisory"])
+        self.assertEqual(adv["level"], "critical")
+        self.assertIn("danger range", adv["reason"].lower())
+
+    def test_cyclone_advisory_caution_regional(self):
+        cyclone_domain = {
+            "status": "ok",
+            "active_cyclone_nearby": True,
+            "nearest_cyclone_name": "Tropical Cyclone Sitrang",
+            "nearest_cyclone_distance_km": 820.0,
+            "max_wind_speed_kmh": 90.0,
+            "cyclone_alert_level": "Green",
+        }
+        adv = cyclone_advisory(cyclone_domain)
+        self.assertTrue(adv["advisory"])
+        self.assertEqual(adv["level"], "caution")
+        self.assertIn("maritime", adv["reason"].lower())
+
+    def test_cyclone_advisory_nominal_distant(self):
+        cyclone_domain = {
+            "status": "ok",
+            "active_cyclone_nearby": False,
+            "nearest_cyclone_name": "Tropical Cyclone Saudel",
+            "nearest_cyclone_distance_km": 4050.0,
+            "max_wind_speed_kmh": 75.0,
+            "cyclone_alert_level": "Green",
+        }
+        adv = cyclone_advisory(cyclone_domain)
+        self.assertFalse(adv["advisory"])
+        self.assertEqual(adv["level"], "nominal")
+        self.assertIsNone(adv["reason"])
+
+    def test_air_quality_causality_biomass_burning(self):
+        fire_domain = {
+            "status": "ok",
+            "hotspot_count": 8,
+            "fire_detected": True,
+            "nearest_hotspot_distance_km": 115.0,
+            "max_frp_mw": 52.4,
+        }
+        causality = air_quality_causality(pm25=82.0, fire_domain=fire_domain)
+        self.assertTrue(causality["elevated_pm25"])
+        self.assertTrue(causality["biomass_burning_detected"])
+        self.assertEqual(causality["hotspots_within_300km"], 8)
+        self.assertIn("biomass burning", causality["causal_attribution"].lower())
+
+    def test_air_quality_causality_urban_emissions(self):
+        fire_domain = {
+            "status": "ok",
+            "hotspot_count": 0,
+            "fire_detected": False,
+            "nearest_hotspot_distance_km": None,
+            "max_frp_mw": None,
+        }
+        causality = air_quality_causality(pm25=95.0, fire_domain=fire_domain)
+        self.assertTrue(causality["elevated_pm25"])
+        self.assertFalse(causality["biomass_burning_detected"])
+        self.assertIn("urban", causality["causal_attribution"].lower())
+
+    def test_air_quality_causality_nominal(self):
+        fire_domain = {"status": "ok", "hotspot_count": 2}
+        causality = air_quality_causality(pm25=18.0, fire_domain=fire_domain)
+        self.assertFalse(causality["elevated_pm25"])
+        self.assertIn("nominal", causality["causal_attribution"].lower())
 
 
 if __name__ == "__main__":

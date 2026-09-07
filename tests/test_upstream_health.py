@@ -29,9 +29,9 @@ class TestUpstreamHealth(unittest.TestCase):
 
         health = upstream_health.get_upstream_health()
         self.assertEqual(health["overall_status"], "healthy")
-        self.assertEqual(health["healthy_count"], 7)
-        self.assertEqual(health["total_count"], 7)
-        self.assertEqual(len(health["providers"]), 7)
+        self.assertEqual(health["healthy_count"], 10)
+        self.assertEqual(health["total_count"], 10)
+        self.assertEqual(len(health["providers"]), 10)
         self.assertIn("average_latency_ms", health)
         self.assertIn("timestamp", health)
 
@@ -43,6 +43,9 @@ class TestUpstreamHealth(unittest.TestCase):
         self.assertIn("nasa_power", provider_ids)
         self.assertIn("sunrise_sunset", provider_ids)
         self.assertIn("open_elevation", provider_ids)
+        self.assertIn("open_meteo_flood", provider_ids)
+        self.assertIn("gdacs_disaster", provider_ids)
+        self.assertIn("nasa_firms", provider_ids)
 
     @patch("upstream_health.requests.get")
     def test_get_upstream_health_degraded(self, mock_get):

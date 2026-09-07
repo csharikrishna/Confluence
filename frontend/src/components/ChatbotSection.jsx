@@ -27,7 +27,7 @@ export function ChatbotSection({ initialQuery = "" }) {
     {
       id: 'welcome',
       sender: 'assistant',
-      text: "👋 Welcome to Confluence Coastal Assistant. I perform live deterministic tool-calling against real-time physical sensor data across our 7 upstream scientific providers. Ask me about coastal departure safety, wave swell, sea states, or marine hazards.",
+      text: "👋 Welcome to Confluence Coastal Assistant. I perform live deterministic tool-calling against real-time physical sensor data across our 10 upstream scientific providers. Ask me about coastal departure safety, wave swell, sea states, or marine hazards.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
   ]);
@@ -175,7 +175,7 @@ export function ChatbotSection({ initialQuery = "" }) {
               </span>
             </div>
             <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Grounded Marine Decision Support • Deterministic Physics • Live 7-Source Tool-Calling
+              Grounded Marine Decision Support • Deterministic Physics • Live 10-Source Tool-Calling
             </p>
           </div>
         </div>

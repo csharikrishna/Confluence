@@ -38,8 +38,8 @@ export function UpstreamHealthView() {
   }, []);
 
   const overall = healthData?.overall_status || 'healthy';
-  const healthyCount = healthData?.healthy_count ?? 7;
-  const totalCount = healthData?.total_count ?? 7;
+  const healthyCount = healthData?.healthy_count ?? 10;
+  const totalCount = healthData?.total_count ?? 10;
   const avgLatency = healthData?.average_latency_ms ?? 142.5;
 
   return (
@@ -65,13 +65,13 @@ export function UpstreamHealthView() {
           marginBottom: '12px',
         }}>
           <Radio size={14} aria-hidden="true" />
-          <span>Real-Time Ingestion Diagnostics • 7 Scientific Upstream Nodes</span>
+          <span>Real-Time Ingestion Diagnostics • 10 Scientific Upstream Nodes</span>
         </div>
         <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', textWrap: 'balance' }}>
           Upstream Services Health & Latency Dashboard
         </h1>
         <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '760px' }}>
-          Live concurrent ping telemetry measuring round-trip network latency and HTTP availability across all 7 scientific data providers against published SLA targets.
+          Live concurrent ping telemetry measuring round-trip network latency and HTTP availability across all 10 scientific data providers against published SLA targets.
         </p>
       </div>
 
@@ -184,10 +184,10 @@ export function UpstreamHealthView() {
         </div>
       </div>
 
-      {/* 7 Provider Health Cards Grid */}
+      {/* 10 Provider Health Cards Grid */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-          Individual Provider Status Breakdown ({healthData?.providers?.length || 7})
+          Individual Provider Status Breakdown ({healthData?.providers?.length || 10})
         </h2>
 
         <div style={{
@@ -292,7 +292,7 @@ export function UpstreamHealthView() {
             })
           ) : (
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-              Pinging 7 upstream provider endpoints…
+              Pinging 10 upstream provider endpoints…
             </div>
           )}
         </div>

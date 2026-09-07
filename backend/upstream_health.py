@@ -1,7 +1,7 @@
 """
 Confluence Upstream Telemetry Health & Latency Monitor
-Provides real-time empirical diagnostic pings across all 7 confluent providers.
-- Response Latency: Measured live via round-trip HTTP requests to upstream nodes (Frankfurt, Virginia, London).
+Provides real-time empirical diagnostic pings across all 10 confluent providers.
+- Response Latency: Measured live via round-trip HTTP requests to upstream nodes (Frankfurt, Virginia, London, Geneva, NASA GSFC).
 - Target SLA: Published service level agreement targets from provider documentation (not rolling historical calculation).
 """
 
@@ -88,6 +88,36 @@ PROVIDERS_CONFIG = [
         "historical_uptime": 99.40,
         "docs_url": "https://open-elevation.com/",
     },
+    {
+        "id": "open_meteo_flood",
+        "name": "Open-Meteo Flood & River Discharge",
+        "category": "Hydrology & River Basin Discharge",
+        "region": "Frankfurt, EU",
+        "url": "https://flood-api.open-meteo.com/v1/flood?latitude=22.57&longitude=88.36&daily=river_discharge",
+        "timeout": 4.0,
+        "historical_uptime": 99.95,
+        "docs_url": "https://open-meteo.com/en/docs/flood-api",
+    },
+    {
+        "id": "gdacs_disaster",
+        "name": "GDACS Disaster Alerts & Cyclones",
+        "category": "Tropical Cyclones & Disasters",
+        "region": "Geneva / Ispra, EU",
+        "url": "https://www.gdacs.org/xml/rss.xml",
+        "timeout": 5.0,
+        "historical_uptime": 99.90,
+        "docs_url": "https://www.gdacs.org/",
+    },
+    {
+        "id": "nasa_firms",
+        "name": "NASA FIRMS Thermal Anomalies",
+        "category": "Satellite Active Fire & Smoke Causality",
+        "region": "NASA GSFC, MD, US",
+        "url": "https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_South_Asia_24h.csv",
+        "timeout": 5.0,
+        "historical_uptime": 99.92,
+        "docs_url": "https://firms.modaps.eosdis.nasa.gov/",
+    },
 ]
 
 
@@ -148,14 +178,14 @@ def _ping_provider(provider: Dict[str, Any]) -> Dict[str, Any]:
 
 def check_all_upstream_health() -> Dict[str, Any]:
     """
-    Concurrently checks all 7 upstream providers using a ThreadPoolExecutor.
+    Concurrently checks all 10 upstream providers using a ThreadPoolExecutor.
     Returns composite health status payload.
     """
-    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         results = list(executor.map(_ping_provider, PROVIDERS_CONFIG))
 
     healthy_count = sum(1 for r in results if r["status"] == "healthy")
-    overall_status = "healthy" if healthy_count >= 6 else ("degraded" if healthy_count >= 4 else "outage")
+    overall_status = "healthy" if healthy_count >= 8 else ("degraded" if healthy_count >= 6 else "outage")
     avg_latency = round(sum(r["latency_ms"] for r in results) / len(results), 1)
 
     return {

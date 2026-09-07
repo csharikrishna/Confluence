@@ -19,10 +19,13 @@ from environmental_data import (
     fetch_marine,
     fetch_air_quality,
     fetch_model_air_quality,
+    fetch_river_discharge,
     fetch_sun_and_lighting,
     fetch_elevation,
     fetch_seismic_risk,
     fetch_climate_baseline,
+    fetch_gdacs_cyclones,
+    fetch_fire_hotspots,
     validate_coordinates,
     validate_environmental_data,
     normalize_iso_utc,
@@ -353,6 +356,8 @@ class TestEnvironmentalIntelligence(unittest.TestCase):
 
         result = fetch_model_air_quality(13.08, 80.27)
         self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["source"], "open-meteo-air-quality-modeled")
+        self.assertEqual(result["data_type"], "modeled")
         self.assertEqual(result["pm25"], 21.5)
         self.assertEqual(result["us_aqi"], 75)
         self.assertEqual(result["tier"], "atmospheric_model")
@@ -407,6 +412,138 @@ class TestEnvironmentalIntelligence(unittest.TestCase):
         self.assertEqual(result["recent_events_7d_count"], 2)
         self.assertEqual(result["max_magnitude"], 5.1)
         self.assertEqual(result["hazard_level"], "nominal")
+
+    @patch("requests.get")
+    def test_mocked_fetch_river_discharge_active_basin(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "daily": {
+                "time": ["2026-09-07", "2026-09-08"],
+                "river_discharge": [42.5, 48.1],
+            }
+        }
+        mock_get.return_value = mock_resp
+
+        result = fetch_river_discharge(22.57, 88.36)
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(result["applicable"])
+        self.assertEqual(result["river_discharge_m3s"], 42.5)
+        self.assertEqual(result["discharge_max_7d_m3s"], 48.1)
+        self.assertEqual(result["source"], "open-meteo-flood")
+
+    @patch("requests.get")
+    def test_mocked_fetch_river_discharge_not_applicable(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "daily": {
+                "time": ["2026-09-07", "2026-09-08"],
+                "river_discharge": [None, None],
+            }
+        }
+        mock_get.return_value = mock_resp
+
+        result = fetch_river_discharge(13.08, 80.27)
+        self.assertEqual(result["status"], "ok")
+        self.assertFalse(result["applicable"])
+        self.assertIsNone(result["river_discharge_m3s"])
+        self.assertIn("No active river basin", result["note"])
+
+    @patch("environmental_data.fetch_river_discharge")
+    @patch("environmental_data.fetch_weather")
+    @patch("environmental_data.fetch_marine")
+    @patch("environmental_data.fetch_air_quality")
+    @patch("environmental_data.fetch_model_air_quality")
+    def test_openaq_fallback_to_model_air_quality_when_no_station(
+        self, mock_model_aq, mock_openaq, mock_marine, mock_weather, mock_flood
+    ):
+        mock_weather.return_value = {"source": "open-meteo", "status": "ok", "temperature_c": 30.0, "latency_ms": 100}
+        mock_marine.return_value = {"source": "open-meteo-marine", "status": "ok", "wave_height_m": 1.0, "latency_ms": 120}
+        mock_flood.return_value = {"source": "open-meteo-flood", "status": "ok", "applicable": False, "river_discharge_m3s": None, "latency_ms": 90}
+        
+        # OpenAQ returns no station found
+        mock_openaq.return_value = {
+            "source": "openaq",
+            "status": "error",
+            "error": "No monitoring stations found within 25km of this location",
+            "latency_ms": 350
+        }
+        # Model AQ fallback succeeds
+        mock_model_aq.return_value = {
+            "station_name": "Global CAMS Atmospheric Model (Open-Meteo)",
+            "tier": "atmospheric_model",
+            "data_type": "modeled",
+            "pm25": 18.4,
+            "source": "open-meteo-air-quality-modeled",
+            "status": "ok",
+            "latency_ms": 150
+        }
+
+        snapshot = get_environmental_snapshot(10.0, 72.0, bypass_cache=True)
+        aq = snapshot["data"]["air_quality"]
+        self.assertEqual(aq["status"], "ok")
+        self.assertEqual(aq["source"], "open-meteo-air-quality-modeled")
+        self.assertEqual(aq["data_type"], "modeled")
+        self.assertEqual(aq["pm25"], 18.4)
+        # Should be called exactly once
+        mock_model_aq.assert_called_once()
+
+    @patch("environmental_data.requests.get")
+    def test_mocked_fetch_gdacs_cyclones_active_nearby(self, mock_get):
+        xml_content = """<?xml version="1.0" encoding="utf-8"?>
+        <rss version="2.0" xmlns:gdacs="http://www.gdacs.org" xmlns:georss="http://www.georss.org/georss">
+          <channel>
+            <item>
+              <title>Orange alert for Tropical Cyclone DANA</title>
+              <gdacs:eventtype>TC</gdacs:eventtype>
+              <gdacs:eventname>DANA-26</gdacs:eventname>
+              <gdacs:alertlevel>Orange</gdacs:alertlevel>
+              <gdacs:severity>Tropical Cyclone (maximum wind speed of 120 km/h)</gdacs:severity>
+              <georss:point>14.2 81.5</georss:point>
+              <link>https://www.gdacs.org/report.aspx?eventid=123</link>
+            </item>
+          </channel>
+        </rss>"""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = xml_content
+        mock_resp.content = xml_content.encode("utf-8")
+        mock_get.return_value = mock_resp
+
+        # Clear cache for isolated test
+        from environmental_data import GDACS_CACHE
+        GDACS_CACHE.clear()
+
+        res = fetch_gdacs_cyclones(13.08, 80.27)
+        self.assertEqual(res["status"], "ok")
+        self.assertTrue(res["active_cyclone_nearby"])
+        self.assertEqual(res["nearest_cyclone_name"], "DANA-26")
+        self.assertEqual(res["cyclone_alert_level"], "Orange")
+        self.assertEqual(res["max_wind_speed_kmh"], 120.0)
+        self.assertLess(res["nearest_cyclone_distance_km"], 200.0)
+
+    @patch("environmental_data.requests.get")
+    def test_mocked_fetch_fire_hotspots_active(self, mock_get):
+        csv_content = """latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight
+13.50,80.50,330.5,0.4,0.6,2026-09-06,0615,N,nominal,2.0,290.1,14.5,D
+14.00,81.00,325.0,0.4,0.6,2026-09-06,0615,N,nominal,2.0,285.0,8.2,D
+"""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = csv_content
+        mock_get.return_value = mock_resp
+
+        # Clear cache for isolated test
+        from environmental_data import FIRMS_CACHE
+        FIRMS_CACHE.clear()
+
+        res = fetch_fire_hotspots(13.08, 80.27)
+        self.assertEqual(res["status"], "ok")
+        self.assertTrue(res["fire_detected"])
+        self.assertGreater(res["hotspot_count"], 0)
+        self.assertEqual(res["max_frp_mw"], 14.5)
+        self.assertIsNotNone(res["nearest_hotspot_distance_km"])
 
 
 if __name__ == "__main__":
