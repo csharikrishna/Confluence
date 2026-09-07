@@ -34,7 +34,7 @@ class TestLiveDeployment(unittest.TestCase):
 
     def test_02_environment_endpoint(self):
         url = f"{BASE_URL}/environment"
-        params = {"lat": 13.08, "lon": 80.27, "name": "Chennai Coast"}
+        params = {"lat": 13.08, "lon": 80.27, "name": "Chennai Coast", "bypass_cache": "true"}
         r = requests.get(url, params=params, timeout=25)
         self.assertEqual(r.status_code, 200, f"Expected 200 from {url}, got {r.status_code}: {r.text}")
         data = r.json()
@@ -53,8 +53,8 @@ class TestLiveDeployment(unittest.TestCase):
             data["meta"]["confidence"].startswith("high") or data["meta"]["confidence"].startswith("partial"),
             f"Unexpected confidence string: {data['meta']['confidence']}"
         )
-        self.assertIn("cyclone_advisory", data.get("derived_insights", {}))
-        self.assertIn("air_quality_causality", data.get("derived_insights", {}))
+        self.assertIn("cyclone_advisory", data.get("meta", {}).get("derived_insights", {}))
+        self.assertIn("air_quality_causality", data.get("meta", {}).get("derived_insights", {}))
 
     def test_03_cache_hit_on_subsequent_request(self):
         url = f"{BASE_URL}/environment"
@@ -111,11 +111,11 @@ class TestLiveDeployment(unittest.TestCase):
         self.assertIn(ct.get("status"), ["ok", "error"])
         if ct.get("status") == "ok":
             self.assertIn("active_cyclones_count", ct)
-            self.assertIn("nearest_cyclone", ct)
-            self.assertIn("distance_km", ct)
-            self.assertIn("alert_level", ct)
-            advisory = data.get("derived_insights", {}).get("cyclone_advisory", {})
-            self.assertIn("risk_level", advisory)
+            self.assertIn("nearest_cyclone_name", ct)
+            self.assertIn("nearest_cyclone_distance_km", ct)
+            self.assertIn("cyclone_alert_level", ct)
+            advisory = data.get("meta", {}).get("derived_insights", {}).get("cyclone_advisory", {})
+            self.assertIn("level", advisory)
 
     def test_08_thermal_hotspots_firms_remote(self):
         """Verify NASA FIRMS thermal hotspot feed responds live and computes causality."""
@@ -130,8 +130,9 @@ class TestLiveDeployment(unittest.TestCase):
             self.assertIn("hotspot_count", th)
             self.assertIn("fire_detected", th)
             self.assertIn("search_radius_km", th)
-            causality = data.get("derived_insights", {}).get("air_quality_causality", {})
-            self.assertIn("biomass_burning_contributing", causality)
+            causality = data.get("meta", {}).get("derived_insights", {}).get("air_quality_causality", {})
+            self.assertIn("biomass_burning_detected", causality)
+            self.assertIn("causal_attribution", causality)
 
     def test_09_upstream_health_ten_providers(self):
         """Verify the /api/health/upstream endpoint lists all 10 distinct providers."""
@@ -139,10 +140,10 @@ class TestLiveDeployment(unittest.TestCase):
         r = requests.get(url, timeout=25)
         self.assertEqual(r.status_code, 200)
         data = r.json()
-        self.assertEqual(data.get("providers_monitored"), 10)
-        providers = data.get("providers", {})
-        self.assertIn("gdacs_disaster", providers)
-        self.assertIn("nasa_firms", providers)
+        self.assertEqual(data.get("total_providers"), 10)
+        provider_ids = [p["id"] for p in data.get("providers", [])]
+        self.assertIn("gdacs_disaster", provider_ids)
+        self.assertIn("nasa_firms", provider_ids)
 
 
 if __name__ == "__main__":
