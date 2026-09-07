@@ -52,6 +52,12 @@ export function OverviewView({ onNavigate, onOpenChat }) {
     }
   };
 
+  const handleAskAboutStation = () => {
+    if (onOpenChat) {
+      onOpenChat(`Analyze current coastal conditions, marine safety, and risks for ${selectedStation.name}`);
+    }
+  };
+
   useEffect(() => {
     fetchTelemetry(selectedStation);
   }, [selectedStation]);
