@@ -150,7 +150,54 @@ class TestPhase3Chatbot(unittest.TestCase):
         self.assertIn("/ask", data["endpoints"])
         self.assertIn("/chat", data["endpoints"])
         self.assertEqual(data["chat_ui"], "/chat")
+        self.assertIn("primary_llm_engine", data)
+
+    @patch("chatbot.call_gemini_llm")
+    @patch("chatbot.is_gemini_available", return_value=True)
+    @patch("chatbot.fetch_grounding_context")
+    def test_ask_coastal_assistant_gemini_routing(self, mock_fetch, mock_avail, mock_gemini):
+        mock_fetch.return_value = (
+            {
+                "location": {"name": "Chennai Coast", "lat": 13.08, "lon": 80.27},
+                "data": {"weather": {"temperature_c": 30.0}},
+                "meta": {},
+            },
+            [],
+        )
+        mock_gemini.return_value = ("Gemini: Seas are calm under 1.0m.", "gemini-3.6-flash")
+
+        res = ask_coastal_assistant("Is it safe in Chennai?", provider="gemini")
+        self.assertEqual(res["location_matched"], "Chennai Coast")
+        self.assertEqual(res["answer"], "Gemini: Seas are calm under 1.0m.")
+        self.assertEqual(res["llm_provider"], "gemini")
+        self.assertEqual(res["llm_model"], "gemini-3.6-flash")
+
+    @patch("chatbot.call_nvidia_llm")
+    @patch("chatbot.call_gemini_llm")
+    @patch("chatbot.is_gemini_available", return_value=True)
+    @patch("chatbot.fetch_grounding_context")
+    def test_ask_coastal_assistant_gemini_fallback_to_nvidia(
+        self, mock_fetch, mock_avail, mock_gemini, mock_nvidia
+    ):
+        mock_fetch.return_value = (
+            {
+                "location": {"name": "Mumbai Coast", "lat": 18.94, "lon": 72.84},
+                "data": {"weather": {"temperature_c": 29.0}},
+                "meta": {},
+            },
+            [],
+        )
+        # Gemini fails with RuntimeError
+        mock_gemini.side_effect = RuntimeError("All candidate models 503")
+        mock_nvidia.return_value = "NVIDIA NIM fallback response."
+
+        res = ask_coastal_assistant("Is it safe in Mumbai?", provider="gemini")
+        self.assertEqual(res["location_matched"], "Mumbai Coast")
+        self.assertEqual(res["answer"], "NVIDIA NIM fallback response.")
+        self.assertEqual(res["llm_provider"], "nvidia")
+        self.assertTrue(mock_nvidia.called)
 
 
 if __name__ == "__main__":
     unittest.main()
+

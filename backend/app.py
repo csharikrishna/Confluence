@@ -46,6 +46,7 @@ from derived_insights import compute_derived_insights
 from rules_engine import evaluate_alerts
 from utils import get_path
 from chatbot import ask_coastal_assistant
+from gemini_client import is_gemini_available
 from auth import (
     register_user,
     authenticate_user,
@@ -345,6 +346,7 @@ def root(request: Request):
             "Phase 3 Grounded LLM Chatbot (/ask, /chat)",
         ],
         "hyperparameters_count": "75 raw physical variables (50+ core standards)",
+        "primary_llm_engine": "Google Gemini (1M token context window, multi-tier fallback)" if is_gemini_available() else "NVIDIA NIM",
         "sources": get_source_summary_strings(),
         "endpoints": ["/environment", "/environment/history", "/locations", "/sources", "/alerts", "/ask", "/chat", "/health", "/docs"],
     }
@@ -724,6 +726,7 @@ class AskRequest(BaseModel):
     location_name: Optional[str] = Field(None, description="Optional target location override (e.g. 'Chennai Coast')")
     bypass_cache: Optional[bool] = Field(False, description="Bypass the 5-minute snapshot cache to force a fresh fetch")
     model: Optional[str] = Field(None, description="Optional override for the LLM model name")
+    provider: Optional[str] = Field(None, description="Optional LLM provider override ('gemini' or 'nvidia')")
 
 
 @app.post(
@@ -750,7 +753,12 @@ def ask_question(request: Request, body: AskRequest, background_tasks: Backgroun
     if body.location_name and body.location_name.lower() not in question.lower():
         query_for_assistant = f"{question} (Location: {body.location_name})"
 
-    res = ask_coastal_assistant(query_for_assistant, bypass_cache=body.bypass_cache, model=body.model)
+    res = ask_coastal_assistant(
+        query_for_assistant,
+        bypass_cache=body.bypass_cache,
+        model=body.model,
+        provider=body.provider,
+    )
     if res.get("location_matched") and res.get("grounding_data"):
         snapshot = res["grounding_data"]
         alerts = res.get("active_alerts", [])

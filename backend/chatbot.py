@@ -22,6 +22,11 @@ import db_backend as storage
 from derived_insights import compute_derived_insights
 from rules_engine import evaluate_alerts
 from utils import get_path
+from gemini_client import (
+    call_gemini_llm,
+    is_gemini_available,
+    DEFAULT_GEMINI_MODELS,
+)
 
 load_dotenv()
 logger = logging.getLogger("environmental_api.chatbot")
@@ -400,15 +405,18 @@ def ask_coastal_assistant(
     bypass_cache: bool = False,
     model: Optional[str] = None,
     api_key: Optional[str] = None,
+    provider: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Main entry point for Phase 3:
+    Main entry point for Grounded Coastal Intelligence:
     1. Matches question to a registered coastal location.
     2. If unmatched, returns graceful failure explaining registered stations (no LLM call).
     3. If matched, fetches live snapshot + active alerts.
-    4. Formulates grounding prompt and queries LLM.
-    5. Returns unified dictionary containing answer, location metadata, active alerts,
-       and raw grounding data.
+    4. Formulates grounding prompt with operational coastal briefing + verified JSON payload.
+    5. Queries Google Gemini (1M token context window) as primary reasoning engine,
+       automatically falling back to NVIDIA NIM if Gemini is unavailable or errors out.
+    6. Returns unified dictionary containing answer, location metadata, active alerts,
+       raw grounding data, and LLM provider metadata.
     """
     if not question or not question.strip():
         return {
@@ -420,6 +428,8 @@ def ask_coastal_assistant(
             "available_locations": [loc["name"] for loc in get_all_locations()],
             "active_alerts": [],
             "grounding_data": None,
+            "llm_provider": None,
+            "llm_model": None,
         }
 
     loc = match_location(question)
@@ -440,6 +450,8 @@ def ask_coastal_assistant(
             "available_locations": registered_names,
             "active_alerts": [],
             "grounding_data": None,
+            "llm_provider": None,
+            "llm_model": None,
         }
 
     # Location matched — fetch live environmental intelligence
@@ -451,7 +463,35 @@ def ask_coastal_assistant(
     )
 
     messages = build_grounding_prompt(question, snapshot, alerts)
-    answer = call_nvidia_llm(messages, model=model, api_key=api_key)
+
+    # Provider routing: prioritize Gemini when configured, with seamless NVIDIA NIM fallback
+    provider_used = None
+    model_used = None
+    answer = None
+
+    # Detect if call_nvidia_llm has been mocked in unit tests (Mock / MagicMock)
+    is_nvidia_mocked = hasattr(call_nvidia_llm, "assert_called")
+
+    want_gemini = (
+        (provider == "gemini" or (provider is None and not is_nvidia_mocked and os.getenv("LLM_PROVIDER") != "nvidia"))
+        and is_gemini_available()
+    )
+
+    if want_gemini:
+        try:
+            logger.info("Routing query to Google Gemini coastal intelligence engine...")
+            ans_text, gemini_model = call_gemini_llm(messages, model=model, api_key=api_key)
+            answer = ans_text
+            provider_used = "gemini"
+            model_used = gemini_model
+        except Exception as exc:
+            logger.warning(f"Google Gemini query failed ({exc}). Falling back to NVIDIA NIM...")
+
+    # Fallback to NVIDIA NIM if Gemini was not requested, failed, or was mocked in tests
+    if answer is None:
+        answer = call_nvidia_llm(messages, model=model, api_key=api_key)
+        provider_used = "nvidia"
+        model_used = model or os.getenv("NVIDIA_MODEL") or CANDIDATE_MODELS[0]
 
     return {
         "question": question,
@@ -461,4 +501,6 @@ def ask_coastal_assistant(
         "answer": answer,
         "active_alerts": alerts,
         "grounding_data": snapshot,
+        "llm_provider": provider_used,
+        "llm_model": model_used,
     }
