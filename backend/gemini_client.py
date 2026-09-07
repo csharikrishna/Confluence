@@ -25,12 +25,13 @@ logger = logging.getLogger("environmental_api.gemini")
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 # Prioritized candidate models for coastal environmental intelligence
+# gemini-3.5-flash-lite and 3.1-flash-lite provide sub-3.5s latency, 1M context, and high reliability
 DEFAULT_GEMINI_MODELS = [
-    "gemini-flash-latest",
-    "gemini-3.6-flash",
-    "gemini-3.7-flash",
-    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
 ]
 
 

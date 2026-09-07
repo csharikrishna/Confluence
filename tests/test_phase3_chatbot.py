@@ -69,7 +69,7 @@ class TestPhase3Chatbot(unittest.TestCase):
         self.assertIn("PROACTIVE SAFETY ALERT", messages[0]["content"])
 
         self.assertEqual(messages[1]["role"], "user")
-        self.assertIn("VERIFIED REAL-TIME COASTAL DATA", messages[1]["content"])
+        self.assertIn("OPERATIONAL COASTAL BRIEFING", messages[1]["content"])
         self.assertIn("Chennai Coast", messages[1]["content"])
         self.assertIn("heat_index_warning", messages[1]["content"])
         self.assertIn("Is it safe to fish?", messages[1]["content"])

@@ -234,11 +234,13 @@ def format_operational_briefing(snapshot: Dict[str, Any], alerts: List[Dict[str,
     if alerts:
         lines.append("\n🚨 ACTIVE SAFETY ALERTS (IMMEDIATE OPERATIONAL RESTRICTIONS):")
         for a in alerts:
-            title = a.get("title", "Safety Alert")
+            aid = a.get("id", "")
+            title = a.get("title") or aid or "Safety Alert"
             sev = a.get("severity", "warning").upper()
             msg = a.get("message", "")
             adv = a.get("advisory", "Exercise caution")
-            lines.append(f"- [{sev}] {title}: {msg} -> ADVISORY: {adv}")
+            id_tag = f" ({aid})" if aid else ""
+            lines.append(f"- [{sev}] {title}{id_tag}: {msg} -> ADVISORY: {adv}")
     else:
         lines.append("\n✅ ACTIVE SAFETY STATUS: All parameters currently within normal limits. No active alerts.")
 
