@@ -82,6 +82,8 @@ export function ChatbotSection({ initialQuery = "" }) {
         locationMatched: data.location_matched || null,
         groundingData: data.grounding_data || null,
         activeAlerts: data.active_alerts || [],
+        llmModel: data.llm_model,
+        cacheHit: data.cache_hit,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
@@ -305,6 +307,32 @@ export function ChatbotSection({ initialQuery = "" }) {
                   <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>
                     📍 Station Grounding: {m.locationMatched}
                   </span>
+                  {m.llmModel && (
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: '#0369A1',
+                      background: '#F0F9FF',
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      border: '1px solid #BAE6FD',
+                    }}>
+                      ✦ {m.llmModel}
+                    </span>
+                  )}
+                  {m.cacheHit && (
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: '#047857',
+                      background: '#ECFDF5',
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      border: '1px solid #A7F3D0',
+                    }}>
+                      ⚡ Cached
+                    </span>
+                  )}
                   {m.activeAlerts && m.activeAlerts.length > 0 && (
                     <span className="badge badge-warning" style={{ fontSize: '0.72rem' }}>
                       ⚠️ {m.activeAlerts.length} Active Alert(s)

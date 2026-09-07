@@ -91,6 +91,8 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation, i
         text: data.answer || data.response || "No response text received from analysis engine.",
         metrics: data.context_used || data.telemetry_summary || null,
         sources: data.sources || ["Open-Meteo", "OpenAQ", "Derived Physics Engine"],
+        llmModel: data.llm_model,
+        cacheHit: data.cache_hit,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
@@ -238,6 +240,7 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation, i
                 <option value="Visakhapatnam Coast">Visakhapatnam Coast</option>
                 <option value="Kochi Coast">Kochi Coast</option>
                 <option value="Mumbai Coast">Mumbai Coast</option>
+                <option value="Kolkata / Sundarbans Coast">Kolkata / Sundarbans Coast</option>
               </>
             )}
           </select>
@@ -271,7 +274,7 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation, i
               }}>
                 <MarkdownMessage content={m.text} isUser={m.sender === 'user'} />
 
-                {m.sources && (
+                {(m.sources || m.llmModel) && (
                   <div style={{
                     marginTop: '8px',
                     paddingTop: '8px',
@@ -280,20 +283,49 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation, i
                     color: 'var(--text-muted)',
                     display: 'flex',
                     flexWrap: 'wrap',
+                    alignItems: 'center',
                     gap: '6px',
                   }}>
-                    <span>Grounded in:</span>
-                    {m.sources.map((s, idx) => (
-                      <span key={idx} style={{
-                        background: '#FFFFFF',
+                    {m.llmModel && (
+                      <span style={{
+                        background: '#F0F9FF',
+                        color: '#0369A1',
                         padding: '1px 6px',
                         borderRadius: '4px',
-                        border: '1px solid var(--border-color)',
+                        border: '1px solid #BAE6FD',
                         fontWeight: 600,
                       }}>
-                        {s}
+                        ✦ {m.llmModel}
                       </span>
-                    ))}
+                    )}
+                    {m.cacheHit && (
+                      <span style={{
+                        background: '#ECFDF5',
+                        color: '#047857',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        border: '1px solid #A7F3D0',
+                        fontWeight: 600,
+                      }}>
+                        ⚡ Cached
+                      </span>
+                    )}
+                    {m.sources && (
+                      <>
+                        <span>Grounded in:</span>
+                        {m.sources.map((s, idx) => (
+                          <span key={idx} style={{
+                            background: '#FFFFFF',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-color)',
+                            fontWeight: 600,
+                          }}>
+                            {s}
+                          </span>
+                        ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
