@@ -263,6 +263,18 @@ class TestAlertsEndpoint(Phase2EndpointTestCase):
         self.assertEqual(data["successful_ingests"], 5)
         self.assertEqual(len(data["stations"]), 5)
 
+    def test_sources_registry_endpoint(self):
+        r = self.client.get("/sources")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data["count"], 10)
+        self.assertEqual(len(data["sources"]), 10)
+        source_ids = [s["id"] for s in data["sources"]]
+        self.assertIn("weather", source_ids)
+        self.assertIn("marine", source_ids)
+        self.assertIn("cyclone_tracking", source_ids)
+        self.assertIn("thermal_hotspots", source_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

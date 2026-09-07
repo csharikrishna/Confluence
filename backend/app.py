@@ -58,6 +58,7 @@ from auth import (
     init_auth_db,
 )
 from upstream_health import check_all_upstream_health
+from sources import get_data_sources_registry, get_source_summary_strings
 
 # Reconfigure console encoding for Windows UTF-8 support
 if sys.stdout.encoding != "utf-8":
@@ -343,20 +344,22 @@ def root(request: Request):
             "Optional Slack/Discord alert webhook (ALERT_WEBHOOK_URL)",
             "Phase 3 Grounded LLM Chatbot (/ask, /chat)",
         ],
-        "hyperparameters_count": "50+ physical variables",
-        "sources": [
-            "Open-Meteo Weather (14 hyperparameters)",
-            "Open-Meteo Marine (12 hydrodynamic hyperparameters)",
-            "OpenAQ Ground Stations (physical sensor array with Open-Meteo atmospheric model fallback)",
-            "Open-Meteo Flood API (river discharge & estuarine flood forecasting)",
-            "Sunrise-Sunset.org (solar & marine nautical ephemeris)",
-            "Open-Meteo Elevation (topography & coastal flood vulnerability)",
-            "NASA POWER (climatological solar & weather baseline)",
-            "USGS Earthquake Hazards (7-day seismic & tsunami alert)",
-            "GDACS Tropical Cyclone Tracking (UN/EC JRC active cyclone trajectories, intensity & multi-hazard alert level)",
-            "NASA FIRMS (satellite active fire & thermal anomaly detection for PM2.5 causality)",
-        ],
-        "endpoints": ["/environment", "/environment/history", "/locations", "/alerts", "/ask", "/chat", "/health", "/docs"],
+        "hyperparameters_count": "75 raw physical variables (50+ core standards)",
+        "sources": get_source_summary_strings(),
+        "endpoints": ["/environment", "/environment/history", "/locations", "/sources", "/alerts", "/ask", "/chat", "/health", "/docs"],
+    }
+
+
+@app.get(
+    "/sources",
+    tags=["Info"],
+    summary="List all 10 integrated upstream scientific data sources",
+    description="Returns the canonical registry of all 10 independent providers, their base URLs, documentation links, and hyperparameter counts.",
+)
+def list_sources():
+    return {
+        "count": len(get_data_sources_registry()),
+        "sources": get_data_sources_registry(),
     }
 
 

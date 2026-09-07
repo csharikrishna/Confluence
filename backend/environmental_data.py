@@ -27,6 +27,20 @@ if sys.stderr.encoding != "utf-8":
 # Load environment variables from .env
 load_dotenv()
 
+from sources import (
+    OPEN_METEO_WEATHER_URL,
+    OPEN_METEO_MARINE_URL,
+    OPENAQ_LOCATIONS_URL,
+    OPEN_METEO_AIR_QUALITY_URL,
+    SUNRISE_SUNSET_URL,
+    OPEN_METEO_ELEVATION_URL,
+    USGS_SEISMIC_URL,
+    NASA_POWER_CLIMATE_URL,
+    OPEN_METEO_FLOOD_URL,
+    GDACS_CYCLONE_URL,
+    NASA_FIRMS_URL,
+)
+
 # ---------------------------------------------------------------------------
 # CONFIG & CACHING
 # ---------------------------------------------------------------------------
@@ -232,7 +246,7 @@ def validate_environmental_data(data):
 # 1. OPEN-METEO — WEATHER (14 HYPERPARAMETERS)
 # ---------------------------------------------------------------------------
 
-def fetch_weather(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.com/v1/forecast"):
+def fetch_weather(lat, lon, timeout=TIMEOUT, base_url=OPEN_METEO_WEATHER_URL):
     t0 = time.perf_counter()
     params = {
         "latitude": lat,
@@ -285,7 +299,7 @@ def fetch_weather(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.co
 # 2. OPEN-METEO — MARINE (12 HYPERPARAMETERS)
 # ---------------------------------------------------------------------------
 
-def fetch_marine(lat, lon, timeout=TIMEOUT, base_url="https://marine-api.open-meteo.com/v1/marine"):
+def fetch_marine(lat, lon, timeout=TIMEOUT, base_url=OPEN_METEO_MARINE_URL):
     t0 = time.perf_counter()
     params = {
         "latitude": lat,
@@ -340,7 +354,7 @@ def fetch_marine(lat, lon, timeout=TIMEOUT, base_url="https://marine-api.open-me
 # 3. OPENAQ — AIR QUALITY
 # ---------------------------------------------------------------------------
 
-def fetch_air_quality(lat, lon, api_key=None, timeout=TIMEOUT, base_url="https://api.openaq.org/v3/locations"):
+def fetch_air_quality(lat, lon, api_key=None, timeout=TIMEOUT, base_url=OPENAQ_LOCATIONS_URL):
     t0 = time.perf_counter()
     api_key = api_key or OPENAQ_API_KEY
     if not api_key:
@@ -472,14 +486,14 @@ def fetch_air_quality(lat, lon, api_key=None, timeout=TIMEOUT, base_url="https:/
         return {"source": "openaq", "status": "error", "error": str(e), "latency_ms": latency_ms}
 
 
-def fetch_model_air_quality(lat, lon, timeout=TIMEOUT):
+def fetch_model_air_quality(lat, lon, timeout=TIMEOUT, base_url=OPEN_METEO_AIR_QUALITY_URL):
     """
     Open-Meteo Global Air Quality API (Free, zero API key required).
     Acts as atmospheric model layer and universal fallback for coordinates
     where no physical ground station exists (e.g. mid-ocean).
     """
     t0 = time.perf_counter()
-    url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+    url = base_url
     params = {
         "latitude": lat,
         "longitude": lon,
@@ -540,7 +554,7 @@ def fetch_model_air_quality(lat, lon, timeout=TIMEOUT):
 # 4. SUNRISE-SUNSET — ASTRONOMICAL & MARINE LIGHTING (FREE, NO KEY)
 # ---------------------------------------------------------------------------
 
-def fetch_sun_and_lighting(lat, lon, timeout=TIMEOUT, base_url="https://api.sunrise-sunset.org/json"):
+def fetch_sun_and_lighting(lat, lon, timeout=TIMEOUT, base_url=SUNRISE_SUNSET_URL):
     """
     Sunrise-Sunset.org API: Provides solar ephemeris and nautical twilights
     essential for fishermen departure schedules and marine operations.
@@ -581,7 +595,7 @@ def fetch_sun_and_lighting(lat, lon, timeout=TIMEOUT, base_url="https://api.sunr
 # 5. OPEN-METEO — TERRAIN & ELEVATION (FREE, NO KEY)
 # ---------------------------------------------------------------------------
 
-def fetch_elevation(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.com/v1/elevation"):
+def fetch_elevation(lat, lon, timeout=TIMEOUT, base_url=OPEN_METEO_ELEVATION_URL):
     """
     Open-Meteo Elevation API: Topographic height above sea level for coastal
     inundation and storm surge vulnerability modeling.
@@ -613,7 +627,7 @@ def fetch_elevation(lat, lon, timeout=TIMEOUT, base_url="https://api.open-meteo.
 # 6. USGS — SEISMIC & TSUNAMI RISK (FREE, NO KEY)
 # ---------------------------------------------------------------------------
 
-def fetch_seismic_risk(lat, lon, timeout=TIMEOUT, base_url="https://earthquake.usgs.gov/fdsnws/event/1/query"):
+def fetch_seismic_risk(lat, lon, timeout=TIMEOUT, base_url=USGS_SEISMIC_URL):
     """
     USGS Earthquake Hazards API: Queries past 7 days for seismic events (M>=4.0)
     within 500km to flag coastal seismic / tsunami hazards.
@@ -670,7 +684,7 @@ def fetch_seismic_risk(lat, lon, timeout=TIMEOUT, base_url="https://earthquake.u
 # 7. NASA POWER — CLIMATE BASELINE
 # ---------------------------------------------------------------------------
 
-def fetch_climate_baseline(lat, lon, timeout=TIMEOUT, base_url="https://power.larc.nasa.gov/api/temporal/daily/point"):
+def fetch_climate_baseline(lat, lon, timeout=TIMEOUT, base_url=NASA_POWER_CLIMATE_URL):
     t0 = time.perf_counter()
     today = datetime.now(timezone.utc)
     start = (today - timedelta(days=10)).strftime("%Y%m%d")
@@ -726,7 +740,7 @@ def fetch_climate_baseline(lat, lon, timeout=TIMEOUT, base_url="https://power.la
 # 8. OPEN-METEO — RIVER DISCHARGE & FLOOD API (FREE, NO KEY)
 # ---------------------------------------------------------------------------
 
-def fetch_river_discharge(lat, lon, timeout=TIMEOUT, base_url="https://flood-api.open-meteo.com/v1/flood"):
+def fetch_river_discharge(lat, lon, timeout=TIMEOUT, base_url=OPEN_METEO_FLOOD_URL):
     """
     Open-Meteo Global Flood API (Free, zero API key required).
     Provides daily river discharge (m³/s) based on the Copernicus GloFAS model.
@@ -792,7 +806,7 @@ def fetch_river_discharge(lat, lon, timeout=TIMEOUT, base_url="https://flood-api
 # 9. GDACS — GLOBAL DISASTER ALERT & COORDINATION SYSTEM (TROPICAL CYCLONES)
 # ---------------------------------------------------------------------------
 
-def fetch_gdacs_cyclones(lat, lon, timeout=TIMEOUT, base_url="https://www.gdacs.org/xml/rss.xml"):
+def fetch_gdacs_cyclones(lat, lon, timeout=TIMEOUT, base_url=GDACS_CYCLONE_URL):
     """
     Global Disaster Alert and Coordination System (GDACS — UN / EC JRC).
     Free, public feed (XML RSS / GeoJSON) — zero API key required.
