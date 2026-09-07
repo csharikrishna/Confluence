@@ -163,9 +163,12 @@ def call_gemini_llm(
                     candidates = data.get("candidates", [])
                     if candidates and "content" in candidates[0]:
                         parts = candidates[0]["content"].get("parts", [])
-                        if parts and "text" in parts[0]:
-                            text = parts[0]["text"].strip()
-                            return text, candidate
+                        text_chunks = [
+                            p.get("text", "") for p in parts if isinstance(p, dict) and "text" in p
+                        ]
+                        full_text = "".join(text_chunks).strip()
+                        if full_text:
+                            return full_text, candidate
                     raise ValueError(f"Unexpected response payload structure from Gemini: {data}")
 
                 elif resp.status_code == 503:
