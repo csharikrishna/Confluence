@@ -201,12 +201,99 @@ def fetch_grounding_context(
     return snapshot, alerts
 
 
+def format_operational_briefing(snapshot: Dict[str, Any], alerts: List[Dict[str, Any]]) -> str:
+    """
+    Translates 75 raw hyperparameters and 38 derived metrics into an explicit,
+    human-and-model-readable Operational Coastal Briefing with units, safety
+    thresholds, and domain interpretations so the LLM never confuses raw numbers.
+    """
+    loc = snapshot.get("location") or {}
+    data = snapshot.get("data") or {}
+    meta = snapshot.get("meta") or {}
+    derived = meta.get("derived_insights") or {}
+    trend = meta.get("trend_24h") or {}
+
+    weather = data.get("weather") or {}
+    marine = data.get("marine") or {}
+    aq = data.get("air_quality") or {}
+    flood = data.get("river_flood") or {}
+    cyclone = derived.get("cyclone_advisory") or {}
+    fire = derived.get("air_quality_causality") or {}
+
+    lines = []
+    lines.append(f"### OPERATIONAL COASTAL BRIEFING: {loc.get('name', 'Unknown Location')} ({loc.get('lat')}°N, {loc.get('lon')}°E)")
+    lines.append(f"Observation Timestamp: {snapshot.get('generated_at') or snapshot.get('timestamp_utc') or 'Live Telemetry'}")
+
+    # 1. Active Safety Alerts
+    if alerts:
+        lines.append("\n🚨 ACTIVE SAFETY ALERTS (IMMEDIATE OPERATIONAL RESTRICTIONS):")
+        for a in alerts:
+            title = a.get("title", "Safety Alert")
+            sev = a.get("severity", "warning").upper()
+            msg = a.get("message", "")
+            adv = a.get("advisory", "Exercise caution")
+            lines.append(f"- [{sev}] {title}: {msg} -> ADVISORY: {adv}")
+    else:
+        lines.append("\n✅ ACTIVE SAFETY STATUS: All parameters currently within normal limits. No active alerts.")
+
+    # 2. Marine Sea State & Launch Conditions
+    wh = marine.get("wave_height_m")
+    sw_h = marine.get("swell_wave_height_m")
+    sw_p = marine.get("swell_wave_period_s")
+    curr_v = marine.get("ocean_current_velocity_kmh")
+    craft_level = derived.get("small_craft_risk_level", "none")
+    lines.append("\n🌊 MARINE SEA STATE & VESSEL LAUNCH CONDITIONS:")
+    lines.append(f"- Significant Wave Height: {wh if wh is not None else 'N/A'} m (Small Craft Advisory threshold is 2.1 m)")
+    lines.append(f"- Swell State: {sw_h if sw_h is not None else 'N/A'} m height @ {sw_p if sw_p is not None else 'N/A'} s period from {marine.get('swell_wave_direction_deg', 'N/A')}°")
+    lines.append(f"- Surface Ocean Current: {curr_v if curr_v is not None else 'N/A'} km/h drift toward {marine.get('ocean_current_direction_deg', 'N/A')}°")
+    lines.append(f"- Sea Surface Temp: {marine.get('sea_surface_temp_c', 'N/A')} °C")
+    lines.append(f"- Small Craft Risk Tier: {craft_level.upper()} ({'Small uninspected boats should NOT launch' if craft_level in ['small_craft_advisory', 'gale_warning', 'storm_warning', 'critical'] else 'Safe for small craft navigation'})")
+
+    # 3. Atmosphere & Physiological Heat Stress
+    t = weather.get("temperature_c")
+    hi = derived.get("heat_index_c")
+    hi_cat = derived.get("heat_index_category", "normal")
+    p = weather.get("surface_pressure_hpa") or weather.get("pressure_hpa")
+    w = weather.get("wind_speed_kmh")
+    wg = weather.get("wind_gusts_kmh")
+    b_scale = derived.get("beaufort_scale") or {}
+    lines.append("\n🌤️ ATMOSPHERIC CONDITIONS & HEAT STRESS:")
+    lines.append(f"- Ambient Air Temp: {t if t is not None else 'N/A'} °C | Relative Humidity: {weather.get('humidity_pct', 'N/A')}%")
+    lines.append(f"- NOAA Heat Index: {hi if hi is not None else 'N/A'} °C ({hi_cat.upper()}) [Caution >= 27°C, Danger >= 39.4°C, Extreme Danger >= 51.7°C]")
+    lines.append(f"- Barometric Pressure: {p if p is not None else 'N/A'} hPa (24h Trend: {trend.get('pressure_hpa', {}).get('diff', 'N/A')} hPa)")
+    lines.append(f"- Sustained Wind: {w if w is not None else 'N/A'} km/h (Beaufort Force {b_scale.get('force', 'N/A')}: {b_scale.get('name', 'N/A')}) | Peak Gusts: {wg if wg is not None else 'N/A'} km/h")
+    lines.append(f"- Convective Storm Potential: {derived.get('storm_potential_score', 'N/A')} ({derived.get('storm_potential_level', 'low').upper()})")
+
+    # 4. Air Quality & Satellite Smoke Attribution
+    pm25 = aq.get("pm25")
+    aq_cat = aq.get("aqi_category") or "Moderate"
+    lines.append("\n💨 AIR QUALITY & SATELLITE FIRE CAUSALITY:")
+    lines.append(f"- Monitoring Station Node: {aq.get('station_name', 'Physical Sensor')} ({aq.get('data_type', 'measured')})")
+    lines.append(f"- PM2.5 Concentration: {pm25 if pm25 is not None else 'N/A'} µg/m³ [Tier: {aq_cat} | WHO/NAAQS 24h health standard is 35.4 µg/m³]")
+    lines.append(f"- PM10: {aq.get('pm10', 'N/A')} µg/m³ | O3: {aq.get('o3', 'N/A')} µg/m³ | NO2: {aq.get('no2', 'N/A')} µg/m³")
+    lines.append(f"- NASA Satellite Fire Causality: {fire.get('causal_attribution', 'Nominal atmospheric conditions — no active fires within 300km')}")
+    lines.append(f"- Boundary Layer Stagnation: {derived.get('air_stagnation_index', 'low').upper()}")
+
+    # 5. River Delta Hydrology & Severe Hazards
+    c_flood = derived.get("coastal_flood_risk") or {}
+    lines.append("\n🌊 ESTUARINE HYDROLOGY & SEVERE MULTI-HAZARDS:")
+    lines.append(f"- Station Elevation: {data.get('terrain', {}).get('elevation_m', 'N/A')} m above sea level")
+    lines.append(f"- Copernicus GloFAS River Runoff: {flood.get('river_discharge_m3s', 0.0)} m³/s (Compound Deltaic Flood Risk: {c_flood.get('estuarine_compound_risk', False)})")
+    lines.append(f"- GDACS Cyclone Tracking: {cyclone.get('reason') or 'Nominal — No active tropical cyclones within 1000 km'}")
+    lines.append(f"- USGS Seismic / Tsunami Watch: {derived.get('tsunami_advisory', {}).get('reason') or 'Nominal — No shallow M>=6.5 earthquakes within 500 km'}")
+
+    return "\n".join(lines)
+
+
 def build_grounding_prompt(question: str, snapshot: Dict[str, Any], alerts: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     """
-    Constructs the strict grounding prompt adhering to Phase 3 specification:
-    'You are a coastal conditions assistant. Use ONLY the data below to answer.
-    If the data doesn't cover something, say so — don't guess.'
+    Constructs the enhanced grounding prompt adhering to Phase 3 specification:
+    Provides both an explicit, human-and-model-readable Operational Coastal Briefing
+    (explaining what the 75 hyperparameters mean and their safety thresholds)
+    and the full raw technical JSON payload for verification.
     """
+    briefing_text = format_operational_briefing(snapshot, alerts)
+
     context_payload = {
         "location": snapshot.get("location"),
         "timestamp_utc": snapshot.get("timestamp_utc"),
@@ -215,21 +302,26 @@ def build_grounding_prompt(question: str, snapshot: Dict[str, Any], alerts: List
         "trend_24h": (snapshot.get("meta") or {}).get("trend_24h"),
         "active_alerts": alerts,
     }
-
     context_json = json.dumps(context_payload, indent=2, ensure_ascii=False)
 
     system_instruction = (
-        "You are an expert coastal environmental assistant for Confluence. "
-        "Use ONLY the verified real-time data provided below to answer the user's question.\n"
+        "You are an expert coastal environmental intelligence and marine safety assistant for Confluence.\n"
+        "Use ONLY the verified real-time data and operational briefing provided below to answer the user's question.\n"
         "Guidelines:\n"
         "1. Strictly ground your answer in the provided numbers (temperatures, wind speeds, wave heights, PM2.5, tides, seismic data, etc.).\n"
         "2. If the data does not cover something, state so plainly — do not guess or hallucinate.\n"
         "3. PROACTIVE SAFETY ALERT: If there are any active alerts or dangerous marine/weather conditions (e.g. hazardous wave heights, gale winds, poor air quality, rapid pressure drop), highlight them prominently and immediately unprompted.\n"
-        "4. Provide clear, practical advice for fishermen, boaters, coastal residents, or tourists based on the data.\n"
-        "5. Keep the response concise, authoritative, and well-structured with bullet points where appropriate."
+        "4. Interpret physical values using verified safety standards:\n"
+        "   - Wave Height >= 2.1m means Small Craft Advisory (dangerous for artisanal/small fishing boats).\n"
+        "   - Heat Index >= 39.4°C is the DANGER band (heat cramps/exhaustion likely with physical exertion).\n"
+        "   - PM2.5 > 35.4 µg/m³ exceeds the WHO 24-hour health threshold; cite the NASA satellite fire attribution.\n"
+        "   - River Discharge combined with high seas and low elevation creates Compound Estuarine Flood Risk.\n"
+        "5. Provide clear, practical advice for fishermen, boaters, coastal residents, or tourists based on the data.\n"
+        "6. Keep the response concise, authoritative, and well-structured with bullet points where appropriate."
     )
 
     user_content = (
+        f"{briefing_text}\n\n"
         f"VERIFIED REAL-TIME COASTAL DATA & ALERTS:\n"
         f"```json\n{context_json}\n```\n\n"
         f"User question: {question}"
