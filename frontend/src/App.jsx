@@ -76,6 +76,15 @@ export function App() {
       .catch(e => console.log("Using default coastal locations:", e));
   }, []);
 
+  const [initialChatQuery, setInitialChatQuery] = useState('');
+
+  const handleOpenChat = (query = '') => {
+    if (typeof query === 'string' && query.trim()) {
+      setInitialChatQuery(query);
+    }
+    setIsChatOpen(true);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('conf_session_token');
     setUser(null);
@@ -87,7 +96,7 @@ export function App() {
       <Header 
         activeTab={activeTab}
         setActiveTab={handleTabChange}
-        onOpenChat={() => setIsChatOpen(true)}
+        onOpenChat={() => handleOpenChat()}
         user={user}
         onLogout={handleLogout}
       />
@@ -97,7 +106,7 @@ export function App() {
         {activeTab === 'overview' && (
           <OverviewView 
             onNavigate={handleTabChange}
-            onOpenChat={() => setIsChatOpen(true)}
+            onOpenChat={handleOpenChat}
           />
         )}
 
@@ -123,14 +132,19 @@ export function App() {
 
       {/* Floating Action Button to launch drawer (only when not on full chatbot tab and drawer not open) */}
       {activeTab !== 'chatbot' && !isChatOpen && (
-        <FloatingChatButton onClick={() => setIsChatOpen(true)} />
+        <FloatingChatButton onClick={() => handleOpenChat()} />
       )}
 
       {/* Slide-out Grounded Assistant Drawer */}
       <ChatDrawer 
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={() => {
+          setIsChatOpen(false);
+          setInitialChatQuery('');
+        }}
         locations={locations}
+        initialQuery={initialChatQuery}
+        onClearInitialQuery={() => setInitialChatQuery('')}
       />
 
       {/* Global Footer */}

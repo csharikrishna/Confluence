@@ -251,6 +251,18 @@ class TestAlertsEndpoint(Phase2EndpointTestCase):
         r = self.client.get("/alerts?lat=13.08")
         self.assertEqual(r.status_code, 400)
 
+    @patch("app.get_environmental_snapshot")
+    def test_ingest_registered_locations_endpoint(self, mock_snapshot):
+        mock_snapshot.return_value = dict(CALM_SNAPSHOT)
+
+        r = self.client.get("/api/tasks/ingest-locations")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data["status"], "completed")
+        self.assertEqual(data["total_stations"], 5)
+        self.assertEqual(data["successful_ingests"], 5)
+        self.assertEqual(len(data["stations"]), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

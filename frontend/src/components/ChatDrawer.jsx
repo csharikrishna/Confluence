@@ -20,7 +20,7 @@ const SUGGESTIONS = [
   "Assess heat index and marine storm potential for Mumbai"
 ];
 
-export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation }) {
+export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation, initialQuery, onClearInitialQuery }) {
   const [selectedLoc, setSelectedLoc] = useState(currentLocation?.name || "Chennai Coast");
   const [messages, setMessages] = useState([
     {
@@ -45,6 +45,13 @@ export function ChatDrawer({ isOpen, onClose, locations = [], currentLocation })
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && initialQuery && initialQuery.trim()) {
+      handleSend(initialQuery);
+      if (onClearInitialQuery) onClearInitialQuery();
+    }
+  }, [isOpen, initialQuery]);
 
   const handleSend = async (queryText) => {
     const textToSend = queryText || inputQuery;

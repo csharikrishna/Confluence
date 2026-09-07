@@ -35,6 +35,7 @@ export function OverviewView({ onNavigate, onOpenChat }) {
   const [telemetry, setTelemetry] = useState(null);
   const [loading, setLoading] = useState(false);
   const [chatPrompt, setChatPrompt] = useState("");
+  const [heroQuery, setHeroQuery] = useState("");
 
   const fetchTelemetry = async (station) => {
     setLoading(true);
@@ -55,106 +56,182 @@ export function OverviewView({ onNavigate, onOpenChat }) {
     fetchTelemetry(selectedStation);
   }, [selectedStation]);
 
-  const snap = telemetry?.data || {};
-  const weather = snap.weather || {};
-  const marine = snap.marine || {};
-  const air = snap.air_quality || {};
-  const derived = snap.derived_insights || {};
-
-  const handleAskAboutStation = () => {
-    setChatPrompt(`What are current coastal conditions and safety risks near ${selectedStation.name}?`);
-    const el = document.getElementById('chatbot');
-    el?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const weather = telemetry?.data?.weather || {};
+  const marine = telemetry?.data?.marine || {};
+  const aq = telemetry?.data?.air_quality || {};
+  const derived = telemetry?.meta?.derived_insights || {};
+  const alerts = telemetry?.meta?.active_alerts || [];
+  const flood = telemetry?.data?.river_flood || {};
+  const cyclones = telemetry?.data?.cyclone_tracking || {};
+  const hotspots = telemetry?.data?.thermal_hotspots || {};
 
   return (
-    <div id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
       
-      {/* =========================================================================
-           1. HERO SECTION (WITH HERO IMAGE & METRIC CHIPS)
-           ========================================================================= */}
+      {/* 1. Hero Section */}
       <section 
-        id="overview"
-        aria-label="Platform Overview"
+        className="hero-section"
+        aria-labelledby="hero-heading"
         style={{
-          background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-          border: '1px solid var(--border-color)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '32px',
+          alignItems: 'center',
+          background: '#FFFFFF',
+          padding: '32px',
           borderRadius: 'var(--radius-xl)',
-          padding: '36px',
+          border: '1px solid var(--border-color)',
           boxShadow: 'var(--shadow-sm)',
         }}
       >
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '36px',
-          alignItems: 'center',
-        }}>
-          {/* Narrative Column */}
-          <div>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'var(--accent-light)',
-              color: 'var(--accent-primary)',
-              border: '1px solid var(--accent-border)',
-              padding: '4px 12px',
-              borderRadius: 'var(--radius-full)',
-              fontSize: '0.82rem',
-              fontWeight: 600,
-              marginBottom: '16px',
-            }}>
-              <Radio size={14} aria-hidden="true" />
-              <span>Verified Empirical Telemetry</span>
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'var(--status-info-bg)',
+            color: 'var(--accent-primary)',
+            padding: '4px 12px',
+            borderRadius: 'var(--radius-full)',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            width: 'fit-content',
+            marginBottom: '16px',
+            border: '1px solid var(--status-info-border)',
+          }}>
+            <Radio size={14} className="pulse-slow" aria-hidden="true" />
+            <span>Verified Empirical Telemetry</span>
+          </div>
 
-            <h1 style={{
-              fontSize: 'clamp(1.9rem, 3.6vw, 2.5rem)',
+          <h1 
+            id="hero-heading"
+            style={{
+              fontSize: 'clamp(1.85rem, 3.5vw, 2.6rem)',
               fontWeight: 800,
               color: 'var(--text-primary)',
-              letterSpacing: '-0.03em',
-              lineHeight: 1.2,
-              marginBottom: '16px',
-            }}>
-              Verified Coastal Environmental & Marine Safety Platform
-            </h1>
+              lineHeight: 1.18,
+              letterSpacing: '-0.025em',
+              marginBottom: '14px',
+            }}
+          >
+            Verified Coastal Environmental & Marine Safety Platform
+          </h1>
 
-            <p style={{
-              fontSize: '0.98rem',
-              color: 'var(--text-secondary)',
-              lineHeight: 1.6,
-              marginBottom: '24px',
-            }}>
-              Confluence concurrently aggregates and validates 50+ atmospheric, hydrodynamic, and terrestrial parameters across 10 verified public sources into real-time operational decision support. Grounded in empirical physical observations — not statistical hallucinations.
-            </p>
+          <p style={{
+            fontSize: '0.98rem',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.6,
+            marginBottom: '20px',
+          }}>
+            Confluence concurrently aggregates and validates 50+ atmospheric, hydrodynamic, and terrestrial parameters across 10 verified public sources into real-time operational decision support. Grounded in empirical physical observations — not statistical hallucinations.
+          </p>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '32px' }}>
-              <a 
-                href="#telemetry"
+          {/* Interactive First-30-Seconds Coastal Query Bar */}
+          <div style={{
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            marginBottom: '24px',
+          }}>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (heroQuery.trim() && onOpenChat) {
+                  onOpenChat(heroQuery.trim());
+                  setHeroQuery('');
+                }
+              }}
+              style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+            >
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Sparkles size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-primary)' }} aria-hidden="true" />
+                <input
+                  type="text"
+                  placeholder="Ask a coastal question (e.g. Can small craft safely launch in Chennai right now?)"
+                  value={heroQuery}
+                  onChange={(e) => setHeroQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px 10px 36px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.86rem',
+                    background: '#FFFFFF',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+              <button
+                type="submit"
                 className="btn-primary"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('telemetry')?.scrollIntoView({ behavior: 'smooth' });
-                }}
+                style={{ padding: '10px 18px', fontSize: '0.86rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                <span>Explore Live Stations</span>
-                <ArrowRight size={16} aria-hidden="true" />
-              </a>
-
-              <button 
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  document.getElementById('chatbot')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                <MessageSquare size={16} style={{ color: 'var(--accent-primary)' }} aria-hidden="true" />
-                <span>Launch AI Assistant 🌊</span>
+                <span>Ask AI</span>
+                <ArrowRight size={14} aria-hidden="true" />
               </button>
-            </div>
+            </form>
 
-            {/* 4 Metric Chips with Tabular Numbers */}
+            {/* Instant suggested pills */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', marginTop: '10px' }}>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Quick Try:</span>
+              {[
+                { label: "Chennai Launch Safety", q: "Can artisanal fishermen safely launch in Chennai right now?" },
+                { label: "Kochi Swell & Waves", q: "What is current wave height and ocean swell in Kochi?" },
+                { label: "Sundarbans River Flood", q: "What is the estuarine river discharge in Kolkata / Sundarbans delta?" },
+                { label: "Active Cyclone Systems", q: "Are there any active tropical cyclones near the Indian coastline?" }
+              ].map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => onOpenChat && onOpenChat(item.q)}
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '16px',
+                    padding: '3px 10px',
+                    fontSize: '0.76rem',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.color = 'var(--accent-primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '28px' }}>
+            <a 
+              href="#telemetry"
+              className="btn-primary"
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById('telemetry')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <span>Explore Live Stations</span>
+              <ArrowRight size={16} aria-hidden="true" />
+            </a>
+
+            <button 
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                document.getElementById('chatbot')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <MessageSquare size={16} style={{ color: 'var(--accent-primary)' }} aria-hidden="true" />
+              <span>Launch AI Assistant 🌊</span>
+            </button>
+          </div>
+
+          {/* 4 Metric Chips with Tabular Numbers */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
@@ -234,7 +311,6 @@ export function OverviewView({ onNavigate, onOpenChat }) {
               <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>10 Verified Streams Active</span>
             </div>
           </div>
-        </div>
       </section>
 
       {/* =========================================================================

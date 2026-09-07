@@ -578,11 +578,60 @@ def get_environment_history(
     "/locations",
     tags=["Locations"],
     summary="List registered coastal locations",
-    description="Returns every location the service tracks for pre-warming, scheduled history ingestion, and /alerts.",
+    description="Returns the list of coastal coordinates pre-configured for automatic cache warming and history tracking.",
 )
-def get_locations():
-    locs = get_all_locations()
-    return {"count": len(locs), "locations": locs}
+def list_locations():
+    return {
+        "count": len(get_all_locations()),
+        "locations": get_all_locations(),
+    }
+
+
+@app.get(
+    "/api/tasks/ingest-locations",
+    tags=["History & Trends"],
+    summary="Trigger multi-location hourly snapshot ingestion",
+    description="Fetches live telemetry for all registered locations concurrently and records snapshots to durable history storage.",
+)
+def ingest_registered_locations():
+    """
+    Executes a parallel fresh fetch (bypass_cache=True) across all registered coastal locations
+    and saves each snapshot to durable database storage (MongoDB Atlas or SQLite).
+    Designed to be called by external cron services (e.g. cron-job.org) once per hour.
+    """
+    registered = get_all_locations()
+
+    def _fetch_and_save(loc):
+        lat, lon, name = loc["lat"], loc["lon"], loc["name"]
+        try:
+            snapshot = get_environmental_snapshot(lat, lon, name=name, bypass_cache=True)
+            data = snapshot.get("data", {})
+            meta = snapshot.get("meta", {})
+            alerts = []
+            try:
+                derived = compute_derived_insights(data, lat=lat)
+                meta["derived_insights"] = derived
+                alerts = evaluate_alerts(data, derived, lat=lat, lon=lon, history_lookup=storage.get_reading_hours_ago)
+                meta["active_alerts"] = alerts
+            except Exception as e:
+                logger.warning(f"Ingestion alert/derived evaluation error for {name}: {e}")
+            _persist_and_log(lat, lon, name, snapshot, alerts)
+            return {"name": name, "status": "saved", "lat": lat, "lon": lon}
+        except Exception as e:
+            logger.error(f"Ingestion failed for {name}: {e}")
+            return {"name": name, "status": "error", "error": str(e)}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(registered) or 5) as executor:
+        ingested = list(executor.map(_fetch_and_save, registered))
+
+    success_count = sum(1 for r in ingested if r["status"] == "saved")
+    return {
+        "status": "completed",
+        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "total_stations": len(registered),
+        "successful_ingests": success_count,
+        "stations": ingested,
+    }
 
 
 @app.get(

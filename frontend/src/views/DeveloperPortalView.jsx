@@ -169,7 +169,8 @@ response = requests.get(url, params=params, headers=headers)
 telemetry = response.json()
 
 print(f"Significant Wave Height: {telemetry['data']['marine']['wave_height_m']} m")
-print(f"Heat Index: {telemetry['data']['derived_insights']['heat_index_c']} °C")`,
+print(f"Heat Index: {telemetry['meta']['derived_insights']['heat_index_c']} °C")
+print(f"Active Alerts: {len(telemetry['meta']['active_alerts'])}")`,
 
     javascript: `// Confluence Coastal Telemetry API Client
 const endpoint = new URL("${apiBase}/environment");
@@ -184,9 +185,10 @@ const response = await fetch(endpoint, {
   }
 });
 
-const data = await response.json();
-console.log("Current Sea State:", data.data.derived_insights.sea_state);
-console.log("Air Temperature:", data.data.weather.temperature_c);`
+const payload = await response.json();
+console.log("Significant Wave Height:", payload.data.marine.wave_height_m, "m");
+console.log("Heat Index:", payload.meta.derived_insights.heat_index_c, "°C");
+console.log("Active Alerts:", payload.meta.active_alerts.length);`
   };
 
   return (
