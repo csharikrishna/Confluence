@@ -2,10 +2,16 @@ services:
   - type: web
     name: confluence
     env: python
-    # pymongo is installed unconditionally (small dependency) so flipping
-    # STORAGE_BACKEND=mongo is a pure env-var change — no build step to
-    # remember and get wrong. requirements-gdrive.txt stays opt-in (heavier,
-    # less commonly used) — add it here too if you enable GDRIVE_ENABLED.
+    # Build dependencies:
+    # - requirements.txt: Core FastAPI, uvicorn, slowapi, httpx, argon2-cffi.
+    # - requirements-mongo.txt: Lightweight pymongo driver (included unconditionally
+    #   so flipping STORAGE_BACKEND=mongo is a pure env-var toggle).
+    # - requirements-benchmark.txt: EXCLUDED deliberately from live production build.
+    #   Heavy scientific packages (scikit-learn, numpy, torch, sentence-transformers)
+    #   are needed only for offline CLI benchmarking (scripts/run_rag_benchmark.py).
+    #   Omitting them keeps Render free-tier RAM consumption lean (<250MB vs 512MB limit)
+    #   and prevents container OOM restarts while keeping build times under 2 minutes.
+    # - requirements-gdrive.txt: Opt-in daily DR export (add if GDRIVE_ENABLED is set).
     buildCommand: pip install -r requirements.txt -r requirements-mongo.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
