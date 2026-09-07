@@ -103,7 +103,7 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
               <span>Upstream Health</span>
               <span className="nav-tab-badge nav-tab-badge-live">
                 <span className="badge-pulse-dot" aria-hidden="true" />
-                7 Live
+                10 Live
               </span>
             </button>
           </nav>
@@ -215,7 +215,7 @@ export function Header({ activeTab, setActiveTab, onOpenChat, user, onLogout }) 
                   <span>Upstream Health</span>
                 </div>
                 <span className="nav-tab-badge nav-tab-badge-live">
-                  7 Live
+                  10 Live
                 </span>
               </button>
 
